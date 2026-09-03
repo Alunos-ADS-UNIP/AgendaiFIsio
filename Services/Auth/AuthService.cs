@@ -1,35 +1,74 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Usuario;
 
 namespace AgendaiFisio.Services.Auth
 {
-    public class AuthService
+    public class AuthService : IAuthService 
     {
-        private readonly DistribuidoraContext _context;
+        private readonly AgendaiFisioDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthService(DistribuidoraContext context)
+        public AuthService(AgendaiFisioDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
-        public string RealizarLogin(UsuarioLoginDTO loginDTO)
+
+        public async Task<string> RealizarLoginAsync(UsuarioLoginDTO loginDTO)
         {
-            var usuario = _context.Usuarios.FirstOrDefault(u => u.Email == loginDTO.Email && u.SenhaHash == loginDTO.Senha);
+            var usuario = await _context.Usuarios
+                .FirstOrDefaultAsync(u => u.Email == loginDTO.Email);
 
             if (usuario == null)
             {
-                throw new UnauthorizedAccessException("Credenciais inválidas.");
+                throw new UnauthorizedAccessException("E-mail ou senha inválidos.");
             }
+
             bool senhaValida = BCrypt.Net.BCrypt.Verify(loginDTO.Senha, usuario.SenhaHash);
 
             if (!senhaValida)
             {
-                throw new UnauthorizedAccessException("Credenciais inválidas.");
+                throw new UnauthorizedAccessException("E-mail ou senha inválidos.");
             }
 
-            return $"Login realizado com sucesso para o usuário: {usuario.Email}";
+            // Geração do Token JWT
+            return GerarTokenJwt(usuario);
+        }
+
+        private string GerarTokenJwt(Entities.Usuario usuario)
+        {
+            var jwtSettings = _configuration.GetSection("JwtSettings");
+            var secretKey = jwtSettings.GetValue<string>("SecretKey");
+            var key = Encoding.ASCII.GetBytes(secretKey);
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+                    new Claim(ClaimTypes.Email, usuario.Email),
+                    new Claim(ClaimTypes.Role, usuario.TipoUsuario) // Isso define o papel (Paciente, Profissional, etc)
+                }),
+                Expires = DateTime.UtcNow.AddHours(jwtSettings.GetValue<double>("ExpirationHours")),
+                Issuer = jwtSettings.GetValue<string>("Issuer"),
+                Audience = jwtSettings.GetValue<string>("Audience"),
+                SigningCredentials = new SigningCredentials(
+                    new SymmetricSecurityKey(key), 
+                    SecurityAlgorithms.HmacSha256Signature)
+            };
+
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }

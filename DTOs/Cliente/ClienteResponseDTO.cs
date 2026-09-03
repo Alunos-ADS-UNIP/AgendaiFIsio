@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AgendaiFisio.DTOs.Cliente
+namespace AgendaiFisio.DTOs.Paciente
 {
-    public class ClienteResponseDTO
+    public class PacienteResponseDTO
     {
         public Guid Id { get; set; }
         public string Nome { get; set; }

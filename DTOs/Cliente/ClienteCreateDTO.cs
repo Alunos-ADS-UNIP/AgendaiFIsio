@@ -5,9 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using AgendaiFisio.Validations;
 
-namespace AgendaiFisio.DTOs.Cliente
+namespace AgendaiFisio.DTOs.Paciente
 {
-    public class ClienteCreateDTO
+    public class PacienteCreateDTO
     {
         [Required(ErrorMessage = "O nome é obrigatório.")]
         [ProibirValores("string", "teste", "admin", ErrorMessage = "O nome informado é inválido ou um valor padrão do sistema.")]

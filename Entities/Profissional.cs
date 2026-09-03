@@ -16,5 +16,8 @@ namespace AgendaiFisio.Entities
         public string Especialidade { get; set; }
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; } = true;
+
+        public Guid UsuarioId { get; set; } // FK para a tabela Usuario
+        public virtual Usuario Usuario { get; set; } // Propriedade de navegação para o Profissional associado
     }
 }

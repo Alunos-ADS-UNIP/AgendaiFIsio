@@ -15,12 +15,13 @@ namespace AgendaiFisio.Validations
             _valoresProibidos = valoresProibidos;
         }
 
-        public override bool IsValid(object value)
+        // Adicionada a interrogação (object?) para corrigir o aviso CS8765
+        public override bool IsValid(object? value)
         {
             if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
                 return true; 
      
-            string textoDigitado = value.ToString().Trim().ToLower();
+            string textoDigitado = value.ToString()!.Trim().ToLower(); // O '!' avisa ao compilador que sabemos que não é nulo aqui
            
             foreach (var proibido in _valoresProibidos)
             {
@@ -31,6 +32,6 @@ namespace AgendaiFisio.Validations
             }
 
             return true; 
-    }
+        }
     }
 }

@@ -35,3 +35,4 @@ C:\Users\mugas\AgendaiFisio\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
 C:\Users\mugas\AgendaiFisio\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\mugas\AgendaiFisio\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
 C:\Users\mugas\AgendaiFisio\bin\Debug\net10.0\Scalar.AspNetCore.dll
+C:\Users\mugas\AgendaiFisio\obj\Debug\net10.0\AgendaiFisio.sourcelink.json
