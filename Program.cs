@@ -30,7 +30,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false; // Mude para true em ambiente de produção
+    options.RequireHttpsMetadata = false; 
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -48,16 +48,16 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 4. Configuração do OpenAPI nativo (.NET 10)
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// 5. Configuração do Pipeline HTTP (Sempre depois do builder.Build)
+
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi(); // Gera o JSON de especificação da API
-    app.MapScalarApiReference(); // Monta a interface interativa (acessada em /scalar)
+    app.MapOpenApi(); 
+    app.MapScalarApiReference(); 
 }
 
 app.UseHttpsRedirection();

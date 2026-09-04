@@ -8,10 +8,7 @@ namespace AgendaiFisio.Services.Paciente
 {
    public interface IPacienteService
     {
-        Task<PacienteResponseDTO> GetPacienteByIdAsync(Guid id);
-        
-        Task<PacienteResponseDTO> CreatePacienteAsync(PacienteCreateDTO pacienteCreateDTO);
-        
-        Task<PacienteResponseDTO> UpdatePacienteAsync(Guid id, PacienteUpdateDTO pacienteUpdateDTO);
+        Task<Entities.Paciente> GetPacienteByIdAsync(Guid id);
+        Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto);
     }
 }

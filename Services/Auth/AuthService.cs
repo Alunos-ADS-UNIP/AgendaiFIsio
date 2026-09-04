@@ -41,9 +41,49 @@ namespace AgendaiFisio.Services.Auth
             };
 
             _context.Usuarios.Add(novoUsuario);
+
+            // 3. Criação automática do perfil correspondente
+            if (registroDto.TipoUsuario.Equals("Paciente", StringComparison.OrdinalIgnoreCase))
+            {
+                var novoPaciente = new Entities.Paciente
+                {
+                    UsuarioId = novoUsuario.Id,
+                    NomeCompleto = "Cadastro Pendente",
+                    Cpf = string.Empty,
+                    Telefone = string.Empty,
+                    Sexo = string.Empty,
+                    EstadoCivil = string.Empty,
+                    Endereco = new Entities.Endereco()
+                    {
+                        Rua = string.Empty,
+                        Numero = string.Empty,
+                        Complemento = string.Empty,
+                        Cep = string.Empty,
+                        Bairro = string.Empty,
+                        Cidade = string.Empty,
+                        Estado = string.Empty
+                    }
+                };
+                _context.Pacientes.Add(novoPaciente);
+            }
+            else if (registroDto.TipoUsuario.Equals("Profissional", StringComparison.OrdinalIgnoreCase))
+            {
+                var novoProfissional = new Entities.Profissional
+                {
+                    UsuarioId = novoUsuario.Id,
+                    NomeCompleto = "Cadastro Pendente",
+                    Cpf = string.Empty,
+                    Crefito = string.Empty,
+                    Telefone = string.Empty,
+                    Especialidade = string.Empty
+                };
+                _context.Profissionais.Add(novoProfissional);
+            }
+
+            // 4. Salva o Usuario e o Paciente/Profissional em uma única transação
             await _context.SaveChangesAsync();
 
-            // 3. Retorna os dados mapeados para o DTO de resposta
+            // 5. Retorna os dados mapeados
             return new UsuarioResponseDTO
             {
                 Id = novoUsuario.Id, 
@@ -78,7 +118,7 @@ namespace AgendaiFisio.Services.Auth
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var secretKey = jwtSettings.GetValue<string>("SecretKey");
             
-            // O "!" avisa ao compilador que a chave não será nula, limpando o warning
+            
             var key = Encoding.ASCII.GetBytes(secretKey!); 
 
             var tokenHandler = new JwtSecurityTokenHandler();

@@ -18,8 +18,8 @@ namespace AgendaiFisio.Entities
         
         public virtual Endereco Endereco { get; set; }
 
-        public Guid UsuarioId { get; set; } // FK para a tabela Usuario
+        public Guid UsuarioId { get; set; } 
 
-        public virtual Usuario Usuario { get; set; } // Propriedade de navegação para o Paciente associado
+        public virtual Usuario Usuario { get; set; } 
     }
 }

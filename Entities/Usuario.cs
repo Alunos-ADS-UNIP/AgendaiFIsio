@@ -13,8 +13,8 @@ namespace AgendaiFisio.Entities
 
         public string TipoUsuario { get; set; } // EX: "Clinica", "Paciente", "Profissional"
 
-        public virtual Paciente Paciente { get; set; } // Propriedade de navegação para o Paciente associado    
+        public virtual Paciente Paciente { get; set; }  
 
-        public virtual Profissional Profissional { get; set; } // Propriedade de navegação para o Profissional associado
+        public virtual Profissional Profissional { get; set; } 
     }
 }

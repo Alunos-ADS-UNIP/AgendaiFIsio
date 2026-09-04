@@ -62,7 +62,7 @@ namespace AgendaiFisio.Services.Profissional
             var novoProfissional = new Entities.Profissional
             {
                 Usuario = usuario,
-                NomeCompleto = profissional.Nome, // Ou NomeCompleto, dependendo de como está no seu DTO
+                NomeCompleto = profissional.Nome, 
                 Cpf = profissional.Cpf,
                 Crefito = profissional.Crefito,
                 Telefone = profissional.Telefone,

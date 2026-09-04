@@ -1,16 +1,12 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore; 
+using Microsoft.EntityFrameworkCore;
+using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Paciente;
 using AgendaiFisio.Entities;
-using AgendaiFisio.Constants;
-using AgendaiFisio.Context;
 
 namespace AgendaiFisio.Services.Paciente
 {
-    // A interface IPacienteService também precisará ser atualizada para retornar Task<>
     public class PacienteService : IPacienteService
     {
         private readonly AgendaiFisioDbContext _context;
@@ -20,98 +16,51 @@ namespace AgendaiFisio.Services.Paciente
             _context = context;
         }
 
-        public async Task<PacienteResponseDTO> GetPacienteByIdAsync(Guid id)
+        // 1. Método para buscar o paciente (exigido pela interface)
+        public async Task<Entities.Paciente> GetPacienteByIdAsync(Guid id)
+        {
+            return await _context.Pacientes
+                .Include(p => p.Endereco)
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
+
+        // 2. Método de atualização que criamos (agora com o nome correto)
+        public async Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto)
         {
             var paciente = await _context.Pacientes
-                .Include(p => p.Usuario) 
-                .FirstOrDefaultAsync(p => p.Id == id);
+                .Include(p => p.Endereco)
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
-            if (paciente == null) return null;
+            if (paciente == null)
+                throw new Exception("Perfil de paciente não encontrado para este usuário.");
 
-            return new PacienteResponseDTO
+            paciente.NomeCompleto = dto.NomeCompleto;
+            paciente.Cpf = dto.Cpf;
+            paciente.DataNascimento = dto.DataNascimento;
+            paciente.Telefone = dto.Telefone;
+            paciente.Sexo = dto.Sexo;
+            paciente.EstadoCivil = dto.EstadoCivil;
+
+            if (paciente.Endereco == null)
             {
-                Id = paciente.Id,
-                Nome = paciente.NomeCompleto,
-                Telefone = paciente.Telefone,
-                Email = paciente.Usuario?.Email 
-            };
-        }
-
-        public async Task<PacienteResponseDTO> CreatePacienteAsync(PacienteCreateDTO paciente)
-        {
-            bool emailExists = await _context.Usuarios.AnyAsync(u => u.Email == paciente.Email);
-            if (emailExists)
-            {
-                throw new Exception("O e-mail informado já está em uso.");
+                paciente.Endereco = new Endereco();
             }
 
-            bool cpfExists = await _context.Pacientes.AnyAsync(p => p.Cpf == paciente.Cpf);
-            if (cpfExists)
-            {
-                throw new Exception("O CPF informado já está em uso.");
-            }
+            // Atualiza os dados do endereço vindos do DTO
+            paciente.Endereco.Rua = dto.Rua;
+            paciente.Endereco.Numero = dto.Numero;
+            paciente.Endereco.Cep = dto.Cep;
+            
+            // Preenche com vazio caso o DTO não tenha essas propriedades, 
+            // evitando o erro de "Cannot insert NULL" no banco de dados
+            paciente.Endereco.Complemento = string.Empty;
+            paciente.Endereco.Bairro = string.Empty;
+            paciente.Endereco.Cidade = string.Empty;
+            paciente.Endereco.Estado = string.Empty;
 
-            var usuario = new Usuario
-            {
-                Email = paciente.Email,
-                SenhaHash = BCrypt.Net.BCrypt.HashPassword(paciente.Senha),
-                TipoUsuario = PerfilDeUsuario.Paciente
-            };
-            
-            // Apenas adicionamos ao contexto, ainda não vai para o banco
-            _context.Usuarios.Add(usuario);
-
-            var novoPaciente = new Entities.Paciente 
-            {
-                Usuario = usuario,
-                NomeCompleto = paciente.Nome,
-                Cpf = paciente.Cpf,
-                Telefone = paciente.Telefone
-            };
-            
-            _context.Pacientes.Add(novoPaciente);
-            
             await _context.SaveChangesAsync();
 
-            return new PacienteResponseDTO
-            {
-                Id = novoPaciente.Id,
-                Nome = novoPaciente.NomeCompleto,
-                Telefone = novoPaciente.Telefone,
-                Email = usuario.Email
-            };
-        }
-
-        public async Task<PacienteResponseDTO> UpdatePacienteAsync(Guid id, PacienteUpdateDTO paciente)
-        {
-            var existingPaciente = await _context.Pacientes
-                .Include(p => p.Usuario)
-                .FirstOrDefaultAsync(p => p.Id == id);
-
-            if (existingPaciente == null) return null;
-
-            if (existingPaciente.Usuario != null && existingPaciente.Usuario.Email != paciente.Email)
-            {
-                bool emailInUse = await _context.Usuarios.AnyAsync(u => u.Email == paciente.Email && u.Id != existingPaciente.UsuarioId);
-                if (emailInUse)
-                {
-                    throw new Exception("O novo e-mail informado já está em uso por outra conta.");
-                }
-                existingPaciente.Usuario.Email = paciente.Email;
-            }
-
-            existingPaciente.NomeCompleto = paciente.Nome;
-            existingPaciente.Telefone = paciente.Telefone;
-            
-            await _context.SaveChangesAsync();
-
-            return new PacienteResponseDTO
-            {
-                Id = existingPaciente.Id,
-                Nome = existingPaciente.NomeCompleto,
-                Telefone = existingPaciente.Telefone,
-                Email = existingPaciente.Usuario?.Email
-            };
+            return true;
         }
     }
 }
