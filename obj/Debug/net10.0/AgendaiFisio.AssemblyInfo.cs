@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AgendaiFisio")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+92732f0abfcf5d7e0db81f05acf03e84464e2d2e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+451a59d55e48b1a21f05c1db5e3e9bc82fd067b2")]
 [assembly: System.Reflection.AssemblyProductAttribute("AgendaiFisio")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AgendaiFisio")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

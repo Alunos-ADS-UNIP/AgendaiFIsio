@@ -2,13 +2,11 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Scalar.AspNetCore;
 using AgendaiFisio.Context;
 using AgendaiFisio.Services.Auth;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Services.Profissional;
-
-// Lembrete: Adicione a injeção de dependência para o serviço de Profissional quando ele for implementado
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AgendaiFisioDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("AgendaiFisioDbContext")));
 
-// 2. Injeção de Dependência (DI) dos Serviços e Repositórios
+// 2. Injeção de Dependência (DI) dos Serviços
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPacienteService, PacienteService>();
 builder.Services.AddScoped<IProfissionalService, ProfissionalService>(); 
@@ -50,24 +48,19 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 4. Configuração do Swagger para aceitar testes com o Token JWT
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference(); // Adiciona uma interface moderna de testes de API na rota /scalar
-}
+// 4. Configuração do OpenAPI nativo (.NET 10)
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// 5. Configuração do Pipeline de Requisições HTTP
+// 5. Configuração do Pipeline HTTP (Sempre depois do builder.Build)
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi(); // Gera o JSON de especificação da API
+    app.MapScalarApiReference(); // Monta a interface interativa (acessada em /scalar)
 }
 
 app.UseHttpsRedirection();
-
 
 app.UseAuthentication();
 app.UseAuthorization();
