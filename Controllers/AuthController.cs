@@ -16,13 +16,31 @@ namespace AgendaiFisio.Controllers
         {
             _authService = authService;
         }
+        
+        
+        [HttpPost("register")]// A rota POST api/auth/register
+        public async Task<IActionResult> Register([FromBody] UsuarioRegisterDTO registroDto)
+        {
+            try
+            {
+                var usuario = await _authService.RegistrarAsync(registroDto);
+                return Ok(new { mensagem = "Usuário cadastrado com sucesso!", dados = usuario });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
+        }
 
-        [HttpPost("login")] // A rota completa ficará: POST api/auth/login
+
+        [HttpPost("login")] // A rota POST api/auth/login
         public async Task<IActionResult> Login([FromBody] UsuarioLoginDTO loginDTO)
         {
-            // O [ApiController] já valida o ModelState (Required, EmailAddress) automaticamente,
-            // mas é sempre bom manter o código limpo.
-            
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
                 // Chama o serviço que busca o usuário e gera o JWT
@@ -46,5 +64,6 @@ namespace AgendaiFisio.Controllers
                 return StatusCode(500, new { Erro = "Ocorreu um erro interno no servidor.", Detalhe = ex.Message });
             }
         }
+
     }
 }

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Usuario;
+using AgendaiFisio.Entities;
 
 namespace AgendaiFisio.Services.Auth
 {
@@ -20,6 +21,35 @@ namespace AgendaiFisio.Services.Auth
         {
             _context = context;
             _configuration = configuration;
+        }
+
+        public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
+        {
+            // 1. Verifica se já existe um usuário com este e-mail
+            var usuarioExistente = await _context.Usuarios
+                .FirstOrDefaultAsync(u => u.Email == registroDto.Email);
+                
+            if (usuarioExistente != null)
+                throw new Exception("Já existe um usuário cadastrado com este e-mail.");
+
+            // 2. Cria a entidade Usuario criptografando a senha com BCrypt
+            var novoUsuario = new Usuario
+            {
+                Email = registroDto.Email.ToLower(),
+                SenhaHash = BCrypt.Net.BCrypt.HashPassword(registroDto.Senha),
+                TipoUsuario = registroDto.TipoUsuario
+            };
+
+            _context.Usuarios.Add(novoUsuario);
+            await _context.SaveChangesAsync();
+
+            // 3. Retorna os dados mapeados para o DTO de resposta
+            return new UsuarioResponseDTO
+            {
+                Id = novoUsuario.Id, 
+                Email = novoUsuario.Email,
+                TipoUsuario = novoUsuario.TipoUsuario
+            };
         }
 
         public async Task<string> RealizarLoginAsync(UsuarioLoginDTO loginDTO)
@@ -43,11 +73,13 @@ namespace AgendaiFisio.Services.Auth
             return GerarTokenJwt(usuario);
         }
 
-        private string GerarTokenJwt(Entities.Usuario usuario)
+        private string GerarTokenJwt(Usuario usuario)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var secretKey = jwtSettings.GetValue<string>("SecretKey");
-            var key = Encoding.ASCII.GetBytes(secretKey);
+            
+            // O "!" avisa ao compilador que a chave não será nula, limpando o warning
+            var key = Encoding.ASCII.GetBytes(secretKey!); 
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -57,7 +89,7 @@ namespace AgendaiFisio.Services.Auth
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Email, usuario.Email),
-                    new Claim(ClaimTypes.Role, usuario.TipoUsuario) // Isso define o papel (Paciente, Profissional, etc)
+                    new Claim(ClaimTypes.Role, usuario.TipoUsuario) 
                 }),
                 Expires = DateTime.UtcNow.AddHours(jwtSettings.GetValue<double>("ExpirationHours")),
                 Issuer = jwtSettings.GetValue<string>("Issuer"),
