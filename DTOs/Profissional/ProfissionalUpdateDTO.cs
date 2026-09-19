@@ -1,19 +1,36 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace AgendaiFisio.DTOs.Profissional
 {
-    // Campos que o próprio fisioterapeuta pode alterar no perfil.
-    // Cpf, Crefito e DataNascimento ficam de fora por serem dados de identidade/registro profissional.
+    // Campos que o fisioterapeuta pode preencher ou corrigir no próprio perfil.
     public class ProfissionalUpdateDTO
     {
-        [Required(ErrorMessage = "O nome é obrigatório.")]
+        [Required(ErrorMessage = "O nome completo é obrigatório.")]
+        [StringLength(150, MinimumLength = 3, ErrorMessage = "O nome deve ter entre 3 e 150 caracteres.")]
         public string NomeCompleto { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "O CPF é obrigatório.")]
+        [RegularExpression(@"^\d{11}$", ErrorMessage = "O CPF deve conter 11 dígitos numéricos, sem pontos ou traços.")]
+        public string Cpf { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "O CREFITO é obrigatório.")]
+        [StringLength(20, MinimumLength = 4, ErrorMessage = "O CREFITO deve ter entre 4 e 20 caracteres.")]
+        public string Crefito { get; set; } = string.Empty;
+
         [Required(ErrorMessage = "O telefone é obrigatório.")]
+        [RegularExpression(@"^\d{10,11}$", ErrorMessage = "O telefone deve conter 10 ou 11 dígitos numéricos, com DDD.")]
         public string Telefone { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "A data de nascimento é obrigatória.")]
+        public DateTime DataNascimento { get; set; }
+
         [Required(ErrorMessage = "A especialidade é obrigatória.")]
+        [StringLength(100, MinimumLength = 3, ErrorMessage = "A especialidade deve ter entre 3 e 100 caracteres.")]
         public string Especialidade { get; set; } = string.Empty;
+
+        [StringLength(1000, ErrorMessage = "A bio pode ter no máximo 1000 caracteres.")]
+        public string Bio { get; set; } = string.Empty;
 
         public bool Ativo { get; set; }
     }

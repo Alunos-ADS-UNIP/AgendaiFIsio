@@ -12,6 +12,7 @@ namespace AgendaiFisio.DTOs.Profissional
         public string Telefone { get; set; } = string.Empty;
         public DateTime DataNascimento { get; set; }
         public string Especialidade { get; set; } = string.Empty;
+        public string Bio { get; set; } = string.Empty;
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; }
         public string Email { get; set; } = string.Empty;

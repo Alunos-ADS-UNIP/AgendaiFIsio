@@ -86,6 +86,7 @@ namespace AgendaiFisio.Services.Profissional
                 Telefone = profissional.Telefone,
                 DataNascimento = profissional.DataNascimento,
                 Especialidade = profissional.Especialidade,
+                Bio = profissional.Bio,
                 DataCadastro = profissional.DataCadastro,
                 Ativo = profissional.Ativo,
                 Email = profissional.Usuario?.Email ?? string.Empty
@@ -102,9 +103,24 @@ namespace AgendaiFisio.Services.Profissional
                 throw new KeyNotFoundException("Fisioterapeuta não encontrado para o usuário informado.");
             }
 
-            profissional.NomeCompleto = dto.NomeCompleto;
-            profissional.Telefone = dto.Telefone;
-            profissional.Especialidade = dto.Especialidade;
+            var crefito = dto.Crefito.Trim();
+
+            // Impede que dois fisioterapeutas fiquem com o mesmo CREFITO.
+            var crefitoEmUso = await _context.Profissionais
+                .AnyAsync(p => p.Id != profissional.Id && p.Crefito == crefito);
+
+            if (crefitoEmUso)
+            {
+                throw new InvalidOperationException("Já existe outro fisioterapeuta cadastrado com este CREFITO.");
+            }
+
+            profissional.NomeCompleto = dto.NomeCompleto.Trim();
+            profissional.Cpf = dto.Cpf.Trim();
+            profissional.Crefito = crefito;
+            profissional.Telefone = dto.Telefone.Trim();
+            profissional.DataNascimento = dto.DataNascimento;
+            profissional.Especialidade = dto.Especialidade.Trim();
+            profissional.Bio = dto.Bio?.Trim() ?? string.Empty;
             profissional.Ativo = dto.Ativo;
 
             await _context.SaveChangesAsync();

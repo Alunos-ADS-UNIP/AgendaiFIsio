@@ -4,6 +4,7 @@ using AgendaiFisio.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AgendaiFisio.Migrations
 {
     [DbContext(typeof(AgendaiFisioDbContext))]
-    partial class AgendaiFisioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260910022206_AdicionaBioProfissional")]
+    partial class AdicionaBioProfissional
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -197,7 +200,7 @@ namespace AgendaiFisio.Migrations
 
                     b.Property<string>("Crefito")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("DataCadastro")
                         .HasColumnType("datetime2");
@@ -221,10 +224,6 @@ namespace AgendaiFisio.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Crefito")
-                        .IsUnique()
-                        .HasFilter("[Crefito] <> ''");
 
                     b.HasIndex("UsuarioId")
                         .IsUnique();

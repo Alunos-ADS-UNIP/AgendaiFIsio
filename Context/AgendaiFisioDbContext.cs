@@ -40,6 +40,12 @@ namespace AgendaiFisio.Context
                 .HasIndex(u => u.Email)
                 .IsUnique();
 
+            // Impede dois fisioterapeutas com o mesmo CREFITO, ignorando os cadastros ainda em branco.
+            modelBuilder.Entity<Profissional>()
+                .HasIndex(p => p.Crefito)
+                .IsUnique()
+                .HasFilter("[Crefito] <> ''");
+
             // Evita apagar avaliações junto com o profissional.
             modelBuilder.Entity<AvaliacaoFisioterapeuta>()
                 .HasOne(a => a.Profissional)

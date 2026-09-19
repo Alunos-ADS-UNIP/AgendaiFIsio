@@ -64,6 +64,12 @@ namespace AgendaiFisio.Controllers
         [Authorize(Roles = "Profissional")]
         public async Task<IActionResult> AtualizarAsync([FromBody] ProfissionalUpdateDTO dto)
         {
+            if (!ModelState.IsValid)
+            {
+                // Informa quais campos obrigatórios não foram preenchidos corretamente.
+                return BadRequest(ModelState);
+            }
+
             try
             {
                 var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -83,6 +89,11 @@ namespace AgendaiFisio.Controllers
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Informa quando o CREFITO informado já pertence a outro fisioterapeuta.
+                return Conflict(new { erro = ex.Message });
             }
             catch (Exception ex)
             {
