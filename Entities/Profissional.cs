@@ -15,6 +15,7 @@ namespace AgendaiFisio.Entities
         public string Telefone { get; set; }
         public DateTime DataNascimento { get; set; }
         public string Especialidade { get; set; }
+        public string Bio { get; set; } = string.Empty;
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; } = true;
 

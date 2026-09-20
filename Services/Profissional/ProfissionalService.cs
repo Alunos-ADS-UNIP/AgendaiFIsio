@@ -1,132 +1,129 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using AgendaiFisio.Context;
+using AgendaiFisio.DTOs;
 using AgendaiFisio.DTOs.Profissional;
-using AgendaiFisio.Entities;
+
+using AgendaiFisio.Context;
 
 namespace AgendaiFisio.Services.Profissional
 {
-    // Busca, cria e atualiza profissionais.
     public class ProfissionalService : IProfissionalService
     {
         private readonly AgendaiFisioDbContext _context;
 
-        // Guarda o banco usado pelo serviço.
         public ProfissionalService(AgendaiFisioDbContext context)
         {
             _context = context;
         }
 
-        // Busca um profissional e os dados da conta ligada a ele.
-        public async Task<ProfissionalResponseDTO> GetProfissionalByIdAsync(Guid id)
+        public async Task<PagedResultDTO<ProfissionalListItemDTO>> ListarAsync(ProfissionalFiltroDTO filtro)
+        {
+            var query = _context.Profissionais.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(filtro.Nome))
+            {
+                var nome = filtro.Nome.Trim().ToLower();
+                query = query.Where(p => p.NomeCompleto.ToLower().Contains(nome));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtro.Especialidade))
+            {
+                var especialidade = filtro.Especialidade.Trim().ToLower();
+                query = query.Where(p => p.Especialidade.ToLower().Contains(especialidade));
+            }
+
+            if (filtro.Ativo.HasValue)
+            {
+                query = query.Where(p => p.Ativo == filtro.Ativo.Value);
+            }
+
+            var totalRegistros = await query.CountAsync();
+
+            var itens = await query
+                .OrderBy(p => p.NomeCompleto)
+                .Skip((filtro.Pagina - 1) * filtro.TamanhoPagina)
+                .Take(filtro.TamanhoPagina)
+                .Select(p => new ProfissionalListItemDTO
+                {
+                    Id = p.Id,
+                    NomeCompleto = p.NomeCompleto,
+                    Especialidade = p.Especialidade,
+                    Crefito = p.Crefito,
+                    Ativo = p.Ativo
+                })
+                .ToListAsync();
+
+            return new PagedResultDTO<ProfissionalListItemDTO>
+            {
+                Itens = itens,
+                TotalRegistros = totalRegistros,
+                PaginaAtual = filtro.Pagina,
+                TamanhoPagina = filtro.TamanhoPagina
+            };
+        }
+
+        public async Task<ProfissionalDetailDTO> ObterPorIdAsync(Guid id)
         {
             var profissional = await _context.Profissionais
+                .AsNoTracking()
                 .Include(p => p.Usuario)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
-            if (profissional == null) return null;
+            if (profissional is null)
+            {
+                throw new KeyNotFoundException("Fisioterapeuta não encontrado.");
+            }
 
-            return new ProfissionalResponseDTO
+            return new ProfissionalDetailDTO
             {
                 Id = profissional.Id,
                 NomeCompleto = profissional.NomeCompleto,
-                Crefito = profissional.Crefito,
-                Especialidade = profissional.Especialidade,
-                Telefone = profissional.Telefone,
-                Email = profissional.Usuario?.Email,
-                Ativo = profissional.Ativo
-            };
-        }
-
-        // Cria a conta e o perfil de um profissional.
-        public async Task<ProfissionalResponseDTO> CreateProfissionalAsync(ProfissionalCreateDTO profissional)
-        {
-            // Impede o cadastro de dados que já pertencem a outra pessoa.
-            bool emailExists = await _context.Usuarios.AnyAsync(u => u.Email == profissional.Email);
-            if (emailExists) throw new Exception("O e-mail informado já está em uso.");
-
-            bool cpfExists = await _context.Profissionais.AnyAsync(p => p.Cpf == profissional.Cpf);
-            if (cpfExists) throw new Exception("O CPF informado já está em uso.");
-
-            bool crefitoExists = await _context.Profissionais.AnyAsync(p => p.Crefito == profissional.Crefito);
-            if (crefitoExists) throw new Exception("O CREFITO informado já está em uso.");
-
-            // Cria a conta de acesso do profissional.
-            var usuario = new Usuario
-            {
-                Email = profissional.Email,
-                SenhaHash = BCrypt.Net.BCrypt.HashPassword(profissional.Senha),
-                TipoUsuario = "Profissional"
-            };
-            
-            _context.Usuarios.Add(usuario);
-
-            // Cria o perfil com situação inicial pendente.
-            var novoProfissional = new Entities.Profissional
-            {
-                Usuario = usuario,
-                NomeCompleto = profissional.Nome, 
                 Cpf = profissional.Cpf,
                 Crefito = profissional.Crefito,
                 Telefone = profissional.Telefone,
-                Especialidade = profissional.Especialidade,
                 DataNascimento = profissional.DataNascimento,
-                DataCadastro = DateTime.UtcNow,
-                
-                Ativo = false 
-            };
-            
-            _context.Profissionais.Add(novoProfissional);
-            await _context.SaveChangesAsync();
-
-            return new ProfissionalResponseDTO
-            {
-                Id = novoProfissional.Id,
-                NomeCompleto = novoProfissional.NomeCompleto,
-                Crefito = novoProfissional.Crefito,
-                Especialidade = novoProfissional.Especialidade,
-                Telefone = novoProfissional.Telefone,
-                Email = usuario.Email,
-                Ativo = novoProfissional.Ativo
+                Especialidade = profissional.Especialidade,
+                Bio = profissional.Bio,
+                DataCadastro = profissional.DataCadastro,
+                Ativo = profissional.Ativo,
+                Email = profissional.Usuario?.Email ?? string.Empty
             };
         }
 
-        // Atualiza os dados de um profissional já cadastrado.
-        public async Task<ProfissionalResponseDTO> UpdateProfissionalAsync(Guid id, ProfissionalUpdateDTO profissional)
+        public async Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto)
         {
-            // Busca o perfil e a conta que será alterada.
-            var existingProfissional = await _context.Profissionais
-                .Include(p => p.Usuario)
-                .FirstOrDefaultAsync(p => p.Id == id);
+            var profissional = await _context.Profissionais
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
-            if (existingProfissional == null) return null;
-
-            if (existingProfissional.Usuario != null && existingProfissional.Usuario.Email != profissional.Email)
+            if (profissional is null)
             {
-                // Confere se o novo e-mail ainda está disponível.
-                bool emailInUse = await _context.Usuarios.AnyAsync(u => u.Email == profissional.Email && u.Id != existingProfissional.UsuarioId);
-                if (emailInUse) throw new Exception("O novo e-mail informado já está em uso por outra conta.");
-                
-                existingProfissional.Usuario.Email = profissional.Email;
+                throw new KeyNotFoundException("Fisioterapeuta não encontrado para o usuário informado.");
             }
 
-            existingProfissional.NomeCompleto = profissional.Nome; 
-            existingProfissional.Telefone = profissional.Telefone;
-            existingProfissional.Especialidade = profissional.Especialidade;
-            
-            await _context.SaveChangesAsync();
+            var crefito = dto.Crefito.Trim();
 
-            return new ProfissionalResponseDTO
+            // Impede que dois fisioterapeutas fiquem com o mesmo CREFITO.
+            var crefitoEmUso = await _context.Profissionais
+                .AnyAsync(p => p.Id != profissional.Id && p.Crefito == crefito);
+
+            if (crefitoEmUso)
             {
-                Id = existingProfissional.Id,
-                NomeCompleto = existingProfissional.NomeCompleto,
-                Crefito = existingProfissional.Crefito,
-                Especialidade = existingProfissional.Especialidade,
-                Telefone = existingProfissional.Telefone,
-                Email = existingProfissional.Usuario?.Email,
-                Ativo = existingProfissional.Ativo
-            };
+                throw new InvalidOperationException("Já existe outro fisioterapeuta cadastrado com este CREFITO.");
+            }
+
+            profissional.NomeCompleto = dto.NomeCompleto.Trim();
+            profissional.Cpf = dto.Cpf.Trim();
+            profissional.Crefito = crefito;
+            profissional.Telefone = dto.Telefone.Trim();
+            profissional.DataNascimento = dto.DataNascimento;
+            profissional.Especialidade = dto.Especialidade.Trim();
+            profissional.Bio = dto.Bio?.Trim() ?? string.Empty;
+            profissional.Ativo = dto.Ativo;
+
+            await _context.SaveChangesAsync();
         }
     }
 }

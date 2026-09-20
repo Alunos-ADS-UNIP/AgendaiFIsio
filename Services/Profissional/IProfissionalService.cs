@@ -1,17 +1,19 @@
 using System;
 using System.Threading.Tasks;
+using AgendaiFisio.DTOs;
 using AgendaiFisio.DTOs.Profissional;
 
 namespace AgendaiFisio.Services.Profissional
 {
-    // Lista as ações disponíveis para profissionais.
     public interface IProfissionalService
     {
-        // Busca um profissional pelo seu identificador.
-        Task<ProfissionalResponseDTO> GetProfissionalByIdAsync(Guid id);
-        // Cria um novo profissional.
-        Task<ProfissionalResponseDTO> CreateProfissionalAsync(ProfissionalCreateDTO profissional);
-        // Atualiza um profissional existente.
-        Task<ProfissionalResponseDTO> UpdateProfissionalAsync(Guid id, ProfissionalUpdateDTO profissional);
+        // Devolve a lista de fisioterapeutas já filtrada e paginada.
+        Task<PagedResultDTO<ProfissionalListItemDTO>> ListarAsync(ProfissionalFiltroDTO filtro);
+
+        // Devolve os dados completos de um fisioterapeuta pelo id.
+        Task<ProfissionalDetailDTO> ObterPorIdAsync(Guid id);
+
+        // Atualiza o perfil do fisioterapeuta identificado pelo usuário logado.
+        Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto);
     }
 }
