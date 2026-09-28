@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using AgendaiFisio.Context;
 using AgendaiFisio.Services.Auth;
+using AgendaiFisio.Services.Especialidade;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Services.Profissional;
 
@@ -18,6 +19,7 @@ builder.Services.AddDbContext<AgendaiFisioDbContext>(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPacienteService, PacienteService>();
 builder.Services.AddScoped<IProfissionalService, ProfissionalService>();
+builder.Services.AddScoped<IEspecialidadeService, EspecialidadeService>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings.GetValue<string>("SecretKey");

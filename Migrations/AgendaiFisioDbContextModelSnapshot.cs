@@ -105,6 +105,25 @@ namespace AgendaiFisio.Migrations
                     b.ToTable("Enderecos");
                 });
 
+            modelBuilder.Entity("AgendaiFisio.Entities.Especialidade", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nome")
+                        .IsUnique();
+
+                    b.ToTable("Especialidades");
+                });
+
             modelBuilder.Entity("AgendaiFisio.Entities.Paciente", b =>
                 {
                     b.Property<Guid>("Id")

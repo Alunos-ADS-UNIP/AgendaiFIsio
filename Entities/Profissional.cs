@@ -19,7 +19,7 @@ namespace AgendaiFisio.Entities
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; } = true;
 
-        public Guid UsuarioId { get; set; } 
+        public Guid UsuarioId { get; set; }
         public virtual Usuario Usuario { get; set; } 
     }
 }

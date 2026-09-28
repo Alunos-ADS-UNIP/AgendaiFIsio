@@ -21,6 +21,7 @@ namespace AgendaiFisio.Context
         public DbSet<AvaliacaoFisioterapeuta> AvaliacaoFisioterapeuta { get; set; }
         public DbSet<PlanoTerapeutico> PlanosTerapeutico { get; set; }
         public DbSet<Endereco> Enderecos { get; set; }
+        public DbSet<Especialidade> Especialidades { get; set; }
 
 
 
@@ -45,6 +46,14 @@ namespace AgendaiFisio.Context
                 .HasIndex(p => p.Crefito)
                 .IsUnique()
                 .HasFilter("[Crefito] <> ''");
+
+            // Impede duas especialidades com o mesmo nome (o SQL Server ignora maiúsculas e acentos).
+            // Serve apenas como catálogo de referência: o campo Profissional.Especialidade é texto livre, sem FK.
+            modelBuilder.Entity<Especialidade>(e =>
+            {
+                e.Property(x => x.Nome).HasMaxLength(100).IsRequired();
+                e.HasIndex(x => x.Nome).IsUnique();
+            });
 
             // Evita apagar avaliações junto com o profissional.
             modelBuilder.Entity<AvaliacaoFisioterapeuta>()
