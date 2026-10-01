@@ -7,6 +7,7 @@ using AgendaiFisio.Context;
 using AgendaiFisio.Services.Auth;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Services.Profissional;
+using AgendaiFisio.Services.Agendamento;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,7 @@ builder.Services.AddDbContext<AgendaiFisioDbContext>(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPacienteService, PacienteService>();
 builder.Services.AddScoped<IProfissionalService, ProfissionalService>();
+builder.Services.AddScoped<IAgendamentoService, AgendamentoService>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings.GetValue<string>("SecretKey");
