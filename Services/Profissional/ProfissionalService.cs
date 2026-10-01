@@ -81,10 +81,8 @@ namespace AgendaiFisio.Services.Profissional
             {
                 Id = profissional.Id,
                 NomeCompleto = profissional.NomeCompleto,
-                Cpf = profissional.Cpf,
                 Crefito = profissional.Crefito,
                 Telefone = profissional.Telefone,
-                DataNascimento = profissional.DataNascimento,
                 Especialidade = profissional.Especialidade,
                 Bio = profissional.Bio,
                 DataCadastro = profissional.DataCadastro,

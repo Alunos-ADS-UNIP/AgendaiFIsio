@@ -18,6 +18,7 @@ namespace AgendaiFisio.DTOs.Usuario
         public string Senha { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "O tipo de usuário é obrigatório (ex: Paciente, Profissional).")]
+        [AgendaiFisio.Validations.TipoUsuarioValido]
         public string TipoUsuario { get; set; } = string.Empty;
     }
 }

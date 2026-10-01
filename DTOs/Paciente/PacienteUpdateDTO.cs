@@ -14,6 +14,7 @@ namespace AgendaiFisio.DTOs.Paciente
         public string NomeCompleto { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "O CPF é obrigatório.")]
+        [AgendaiFisio.Validations.CpfValido(ErrorMessage = "O CPF informado é inválido.")]
         public string Cpf { get; set; } = string.Empty; 
 
         [Required(ErrorMessage = "A data de nascimento é obrigatória.")]
@@ -25,6 +26,11 @@ namespace AgendaiFisio.DTOs.Paciente
         
         public string Rua { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        // Campos omitidos preservam o endereço atual; texto vazio limpa o campo.
+        public string? Complemento { get; set; }
+        public string? Bairro { get; set; }
+        public string? Cidade { get; set; }
+        public string? Estado { get; set; }
         public string Cep { get; set; } = string.Empty;
     }
 }

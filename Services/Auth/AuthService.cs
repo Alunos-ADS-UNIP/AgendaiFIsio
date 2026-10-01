@@ -13,7 +13,7 @@ using AgendaiFisio.Entities;
 namespace AgendaiFisio.Services.Auth
 {
     // Aplica as regras de cadastro, login e criação de tokens.
-    public class AuthService : IAuthService 
+    public class AuthService : IAuthService
     {
         private readonly AgendaiFisioDbContext _context;
         private readonly IConfiguration _configuration;
@@ -29,9 +29,12 @@ namespace AgendaiFisio.Services.Auth
         public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
         {
             // Procura uma conta já cadastrada com o mesmo e-mail.
+            var tipoUsuario = AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(registroDto.TipoUsuario)
+                ?? throw new ArgumentException("Tipo de usuario invalido. Use Paciente ou Profissional.");
+
             var usuarioExistente = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Email == registroDto.Email);
-                
+
             if (usuarioExistente != null)
                 throw new Exception("Já existe um usuário cadastrado com este e-mail.");
 
@@ -40,13 +43,13 @@ namespace AgendaiFisio.Services.Auth
             {
                 Email = registroDto.Email.ToLower(),
                 SenhaHash = BCrypt.Net.BCrypt.HashPassword(registroDto.Senha),
-                TipoUsuario = registroDto.TipoUsuario
+                TipoUsuario = tipoUsuario
             };
 
             _context.Usuarios.Add(novoUsuario);
 
             // Cria um perfil vazio conforme o tipo de usuário.
-            if (registroDto.TipoUsuario.Equals("Paciente", StringComparison.OrdinalIgnoreCase))
+            if (tipoUsuario.Equals("Paciente", StringComparison.OrdinalIgnoreCase))
             {
                 var novoPaciente = new Entities.Paciente
                 {
@@ -69,7 +72,7 @@ namespace AgendaiFisio.Services.Auth
                 };
                 _context.Pacientes.Add(novoPaciente);
             }
-            else if (registroDto.TipoUsuario.Equals("Profissional", StringComparison.OrdinalIgnoreCase))
+            else if (tipoUsuario.Equals("Profissional", StringComparison.OrdinalIgnoreCase))
             {
                 var novoProfissional = new Entities.Profissional
                 {
@@ -89,7 +92,7 @@ namespace AgendaiFisio.Services.Auth
             // Devolve apenas os dados públicos do usuário.
             return new UsuarioResponseDTO
             {
-                Id = novoUsuario.Id, 
+                Id = novoUsuario.Id,
                 Email = novoUsuario.Email,
                 TipoUsuario = novoUsuario.TipoUsuario
             };
@@ -123,9 +126,9 @@ namespace AgendaiFisio.Services.Auth
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var secretKey = jwtSettings.GetValue<string>("SecretKey");
-            
-            
-            var key = Encoding.ASCII.GetBytes(secretKey!); 
+
+
+            var key = Encoding.ASCII.GetBytes(secretKey!);
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -135,13 +138,13 @@ namespace AgendaiFisio.Services.Auth
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Email, usuario.Email),
-                    new Claim(ClaimTypes.Role, usuario.TipoUsuario) 
+                    new Claim(ClaimTypes.Role, AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(usuario.TipoUsuario) ?? usuario.TipoUsuario)
                 }),
                 Expires = DateTime.UtcNow.AddHours(jwtSettings.GetValue<double>("ExpirationHours")),
                 Issuer = jwtSettings.GetValue<string>("Issuer"),
                 Audience = jwtSettings.GetValue<string>("Audience"),
                 SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(key), 
+                    new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256Signature)
             };
 

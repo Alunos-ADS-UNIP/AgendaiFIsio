@@ -12,6 +12,7 @@ namespace AgendaiFisio.DTOs.Profissional
 
         [Required(ErrorMessage = "O CPF é obrigatório.")]
         [RegularExpression(@"^\d{11}$", ErrorMessage = "O CPF deve conter 11 dígitos numéricos, sem pontos ou traços.")]
+        [AgendaiFisio.Validations.CpfValido(ErrorMessage = "O CPF informado é inválido.")]
         public string Cpf { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "O CREFITO é obrigatório.")]
