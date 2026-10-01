@@ -37,11 +37,18 @@ namespace AgendaiFisio.Controllers
                     return Unauthorized("Usuário não identificado no token.");
                 }
 
-                var usuarioId = Guid.Parse(usuarioIdClaim);
+                if (!Guid.TryParse(usuarioIdClaim, out var usuarioId))
+                {
+                    return Unauthorized("Identificador de usuário inválido no token.");
+                }
 
                 await _pacienteService.UpdatePacienteAsync(usuarioId, dto);
 
                 return Ok(new { mensagem = "Perfil atualizado com sucesso!" });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
             }
             catch (Exception ex)
             {

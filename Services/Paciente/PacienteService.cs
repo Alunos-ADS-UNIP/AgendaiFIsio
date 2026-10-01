@@ -35,7 +35,7 @@ namespace AgendaiFisio.Services.Paciente
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (paciente == null)
-                throw new Exception("Perfil de paciente não encontrado para este usuário.");
+                throw new KeyNotFoundException("Perfil de paciente não encontrado para este usuário.");
 
             paciente.NomeCompleto = dto.NomeCompleto;
             paciente.Cpf = dto.Cpf;

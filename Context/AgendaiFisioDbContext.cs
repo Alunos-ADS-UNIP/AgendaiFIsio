@@ -21,6 +21,7 @@ namespace AgendaiFisio.Context
         public DbSet<AvaliacaoFisioterapeuta> AvaliacaoFisioterapeuta { get; set; }
         public DbSet<PlanoTerapeutico> PlanosTerapeutico { get; set; }
         public DbSet<Endereco> Enderecos { get; set; }
+        public DbSet<Agendamento> Agendamentos { get; set; }
 
 
 
@@ -53,6 +54,25 @@ namespace AgendaiFisio.Context
                 .WithMany()
                 .HasForeignKey(a => a.PacienteId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Mantém o histórico de agendamentos mesmo quando há relações no domínio.
+            modelBuilder.Entity<Agendamento>()
+                .HasOne(a => a.Paciente)
+                .WithMany()
+                .HasForeignKey(a => a.PacienteId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Agendamento>()
+                .HasOne(a => a.Profissional)
+                .WithMany()
+                .HasForeignKey(a => a.ProfissionalId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Evita dois agendamentos para o mesmo profissional no mesmo horário.
+            modelBuilder.Entity<Agendamento>()
+                .HasIndex(a => new { a.ProfissionalId, a.DataHora })
+                .IsUnique()
+                .HasFilter("[Status] <> 'Cancelado'");
         }
         
     }
