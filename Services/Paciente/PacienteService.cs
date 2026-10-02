@@ -19,7 +19,7 @@ namespace AgendaiFisio.Services.Paciente
         }
 
         // Busca um paciente e seu endereço pelo identificador.
-        public async Task<Entities.Paciente> GetPacienteByIdAsync(Guid id)
+        public async Task<Entities.Paciente?> GetPacienteByIdAsync(Guid id)
         {
             return await _context.Pacientes
                 .Include(p => p.Endereco)
@@ -35,7 +35,7 @@ namespace AgendaiFisio.Services.Paciente
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (paciente == null)
-                throw new Exception("Perfil de paciente não encontrado para este usuário.");
+                throw new KeyNotFoundException("Perfil de paciente não encontrado para este usuário.");
 
             paciente.NomeCompleto = dto.NomeCompleto;
             paciente.Cpf = dto.Cpf;
@@ -57,10 +57,10 @@ namespace AgendaiFisio.Services.Paciente
             
             
            
-            paciente.Endereco.Complemento = string.Empty;
-            paciente.Endereco.Bairro = string.Empty;
-            paciente.Endereco.Cidade = string.Empty;
-            paciente.Endereco.Estado = string.Empty;
+            if (dto.Complemento is not null) paciente.Endereco.Complemento = dto.Complemento.Trim();
+            if (dto.Bairro is not null) paciente.Endereco.Bairro = dto.Bairro.Trim();
+            if (dto.Cidade is not null) paciente.Endereco.Cidade = dto.Cidade.Trim();
+            if (dto.Estado is not null) paciente.Endereco.Estado = dto.Estado.Trim();
 
             // Salva as alterações feitas no perfil.
             await _context.SaveChangesAsync();

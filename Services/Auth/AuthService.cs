@@ -1,6 +1,5 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,16 +14,8 @@ using AgendaiFisio.Entities;
 namespace AgendaiFisio.Services.Auth
 {
     // Aplica as regras de cadastro, login e criação de tokens.
-    public class AuthService : IAuthService 
+    public class AuthService : IAuthService
     {
-        // Papéis que uma conta pode escolher no autocadastro público. "Clinica" (admin) fica de
-        // fora de propósito: só é provisionado por um mecanismo confiável (ver Program.cs).
-        private static readonly string[] TiposPermitidosNoAutocadastro =
-        {
-            PerfilDeUsuario.Paciente,
-            PerfilDeUsuario.Profissional
-        };
-
         private readonly AgendaiFisioDbContext _context;
         private readonly IConfiguration _configuration;
 
@@ -38,16 +29,12 @@ namespace AgendaiFisio.Services.Auth
         // Cadastra o usuário e cria seu perfil inicial.
         public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
         {
-            // Impede que o cadastro público conceda o papel de Clínica (admin) ou qualquer outro
-            // valor fora da lista — sem isso, bastava registrar com TipoUsuario="Clinica" para
-            // ganhar acesso de administrador (ver docs/especialidades.md, achado 2 da revisão).
-            var tipoPermitido = TiposPermitidosNoAutocadastro
-                .Any(t => t.Equals(registroDto.TipoUsuario, StringComparison.OrdinalIgnoreCase));
-
-            if (!tipoPermitido)
-            {
-                throw new InvalidOperationException("Tipo de usuário inválido para autocadastro.");
-            }
+            // Confere e normaliza o tipo de usuário. "Clinica" (admin) nunca passa por aqui — só é
+            // provisionada por um mecanismo confiável (ver Program.cs). O [TipoUsuarioValido] no
+            // DTO já bloqueia isso no model binding; esta linha é a segunda camada, para quando
+            // o serviço é chamado direto sem passar por ele.
+            var tipoUsuario = AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(registroDto.TipoUsuario)
+                ?? throw new ArgumentException("Tipo de usuario invalido. Use Paciente ou Profissional.");
 
             // Procura uma conta já cadastrada com o mesmo e-mail.
             var usuarioExistente = await _context.Usuarios
@@ -61,13 +48,13 @@ namespace AgendaiFisio.Services.Auth
             {
                 Email = registroDto.Email.ToLower(),
                 SenhaHash = BCrypt.Net.BCrypt.HashPassword(registroDto.Senha),
-                TipoUsuario = registroDto.TipoUsuario
+                TipoUsuario = tipoUsuario
             };
 
             _context.Usuarios.Add(novoUsuario);
 
             // Cria um perfil vazio conforme o tipo de usuário.
-            if (registroDto.TipoUsuario.Equals("Paciente", StringComparison.OrdinalIgnoreCase))
+            if (tipoUsuario.Equals("Paciente", StringComparison.OrdinalIgnoreCase))
             {
                 var novoPaciente = new Entities.Paciente
                 {
@@ -90,7 +77,7 @@ namespace AgendaiFisio.Services.Auth
                 };
                 _context.Pacientes.Add(novoPaciente);
             }
-            else if (registroDto.TipoUsuario.Equals("Profissional", StringComparison.OrdinalIgnoreCase))
+            else if (tipoUsuario.Equals("Profissional", StringComparison.OrdinalIgnoreCase))
             {
                 var novoProfissional = new Entities.Profissional
                 {
@@ -109,7 +96,7 @@ namespace AgendaiFisio.Services.Auth
             // Devolve apenas os dados públicos do usuário.
             return new UsuarioResponseDTO
             {
-                Id = novoUsuario.Id, 
+                Id = novoUsuario.Id,
                 Email = novoUsuario.Email,
                 TipoUsuario = novoUsuario.TipoUsuario
             };
@@ -143,9 +130,9 @@ namespace AgendaiFisio.Services.Auth
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var secretKey = jwtSettings.GetValue<string>("SecretKey");
-            
-            
-            var key = Encoding.ASCII.GetBytes(secretKey!); 
+
+
+            var key = Encoding.ASCII.GetBytes(secretKey!);
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -155,13 +142,13 @@ namespace AgendaiFisio.Services.Auth
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Email, usuario.Email),
-                    new Claim(ClaimTypes.Role, usuario.TipoUsuario) 
+                    new Claim(ClaimTypes.Role, AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(usuario.TipoUsuario) ?? usuario.TipoUsuario)
                 }),
                 Expires = DateTime.UtcNow.AddHours(jwtSettings.GetValue<double>("ExpirationHours")),
                 Issuer = jwtSettings.GetValue<string>("Issuer"),
                 Audience = jwtSettings.GetValue<string>("Audience"),
                 SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(key), 
+                    new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256Signature)
             };
 

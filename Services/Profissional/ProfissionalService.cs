@@ -85,10 +85,8 @@ namespace AgendaiFisio.Services.Profissional
             {
                 Id = profissional.Id,
                 NomeCompleto = profissional.NomeCompleto,
-                Cpf = profissional.Cpf,
                 Crefito = profissional.Crefito,
                 Telefone = profissional.Telefone,
-                DataNascimento = profissional.DataNascimento,
                 Especialidade = profissional.Especialidade is null
                     ? null
                     : new EspecialidadeResponseDTO { Id = profissional.Especialidade.Id, Nome = profissional.Especialidade.Nome },

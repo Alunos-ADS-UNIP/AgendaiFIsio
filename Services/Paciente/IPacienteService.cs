@@ -10,7 +10,7 @@ namespace AgendaiFisio.Services.Paciente
    public interface IPacienteService
     {
           // Busca um paciente pelo seu identificador.
-        Task<Entities.Paciente> GetPacienteByIdAsync(Guid id);
+        Task<Entities.Paciente?> GetPacienteByIdAsync(Guid id);
           // Atualiza os dados do paciente.
         Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto);
     }

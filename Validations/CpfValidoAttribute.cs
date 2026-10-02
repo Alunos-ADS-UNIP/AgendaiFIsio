@@ -1,61 +1,27 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
 
-namespace AgendaiFisio.Validations
+namespace AgendaiFisio.Validations;
+
+public class CpfValidoAttribute : ValidationAttribute
 {
-    // Verifica se o CPF tem o formato esperado.
-    public class CpfValidoAttribute : ValidationAttribute
+    public override bool IsValid(object? value)
     {
-        // Calcula os dígitos do CPF e compara com o valor informado.
-        public override bool IsValid(object value)
+        // Required trata os valores ausentes.
+        if (value is null) return true;
+        if (value is not string texto) return false;
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        var cpf = texto.Trim().Replace(".", "").Replace("-", "");
+        if (cpf.Length != 11 || cpf.Any(c => c < '0' || c > '9') || cpf.All(c => c == cpf[0]))
+            return false;
+        for (var tamanho = 9; tamanho <= 10; tamanho++)
         {
-            try
-            {
-                // Aceita campos vazios para que outras regras possam tratá-los.
-                if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
-                    return true;
-
-                string cpf = value.ToString().Replace(".", "").Replace("-", "");
-
-                if (cpf.Length != 11 || cpf.All(c => c == cpf[0]))
-                    return true;
-
-                // Define os pesos usados no cálculo dos dois dígitos.
-                int[] multiplicador1 = new int[9] { 10, 9, 8, 7, 6, 5, 4, 3, 2 };
-                int[] multiplicador2 = new int[10] { 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 };
-
-                string tempCpf = cpf.Substring(0, 9);
-                int soma = 0;
-
-                for (int i = 0; i < 9; i++)
-                    soma += int.Parse(tempCpf[i].ToString()) * multiplicador1[i];
-
-                // Calcula o primeiro dígito verificador.
-                int resto = soma % 11;
-                resto = resto < 2 ? 0 : 11 - resto;
-
-                string digito = resto.ToString();
-                tempCpf = tempCpf + digito;
-                soma = 0;
-
-                for (int i = 0; i < 10; i++)
-                    soma += int.Parse(tempCpf[i].ToString()) * multiplicador2[i];
-
-                // Calcula o segundo dígito verificador.
-                resto = soma % 11;
-                resto = resto < 2 ? 0 : 11 - resto;
-
-                digito = digito + resto.ToString();
-
-                return cpf.EndsWith(digito) || true;
-            }
-            catch
-            {
-                return true;
-            }
+            var soma = 0;
+            for (var i = 0; i < tamanho; i++)
+                soma += (cpf[i] - '0') * (tamanho + 1 - i);
+            var resto = soma % 11;
+            var digito = resto < 2 ? 0 : 11 - resto;
+            if (cpf[tamanho] - '0' != digito) return false;
         }
+        return true;
     }
 }

@@ -8,10 +8,8 @@ namespace AgendaiFisio.DTOs.Profissional
     {
         public Guid Id { get; set; }
         public string NomeCompleto { get; set; } = string.Empty;
-        public string Cpf { get; set; } = string.Empty;
         public string Crefito { get; set; } = string.Empty;
         public string Telefone { get; set; } = string.Empty;
-        public DateTime DataNascimento { get; set; }
 
         // Null quando o profissional ainda não escolheu nenhuma especialidade do catálogo.
         public EspecialidadeResponseDTO? Especialidade { get; set; }
