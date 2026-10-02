@@ -15,5 +15,8 @@ namespace AgendaiFisio.Services.Profissional
 
         // Atualiza o perfil do fisioterapeuta identificado pelo usuário logado.
         Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto);
+
+        // Escolhe ou substitui a especialidade do fisioterapeuta identificado pelo usuário logado.
+        Task AtualizarEspecialidadeAsync(Guid usuarioId, Guid especialidadeId);
     }
 }

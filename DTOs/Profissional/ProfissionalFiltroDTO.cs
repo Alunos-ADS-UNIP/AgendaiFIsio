@@ -4,7 +4,11 @@ namespace AgendaiFisio.DTOs.Profissional
     public class ProfissionalFiltroDTO
     {
         public string? Nome { get; set; }
-        public string? Especialidade { get; set; }
+
+        // Filtra pelo vínculo exato com o catálogo. Sem este parâmetro, profissionais sem
+        // especialidade escolhida também aparecem na listagem.
+        public System.Guid? EspecialidadeId { get; set; }
+
         public bool? Ativo { get; set; }
 
         private const int TamanhoPaginaMaximo = 50;

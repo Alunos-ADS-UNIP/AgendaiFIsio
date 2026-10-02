@@ -1,4 +1,5 @@
 using System;
+using AgendaiFisio.DTOs.Especialidade;
 
 namespace AgendaiFisio.DTOs.Profissional
 {
@@ -11,7 +12,10 @@ namespace AgendaiFisio.DTOs.Profissional
         public string Crefito { get; set; } = string.Empty;
         public string Telefone { get; set; } = string.Empty;
         public DateTime DataNascimento { get; set; }
-        public string Especialidade { get; set; } = string.Empty;
+
+        // Null quando o profissional ainda não escolheu nenhuma especialidade do catálogo.
+        public EspecialidadeResponseDTO? Especialidade { get; set; }
+
         public string Bio { get; set; } = string.Empty;
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; }

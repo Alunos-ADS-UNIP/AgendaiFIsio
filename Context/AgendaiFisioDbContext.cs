@@ -47,13 +47,31 @@ namespace AgendaiFisio.Context
                 .IsUnique()
                 .HasFilter("[Crefito] <> ''");
 
-            // Impede duas especialidades com o mesmo nome (o SQL Server ignora maiúsculas e acentos).
-            // Serve apenas como catálogo de referência: o campo Profissional.Especialidade é texto livre, sem FK.
+            // Impede duas especialidades com o mesmo nome. A collation Latin1_General_CI_AI faz
+            // a comparação (e o índice único) ignorar maiúsculas/minúsculas e acentos; o trim e o
+            // colapso de espaços internos ficam a cargo do EspecialidadeNomeNormalizador.
             modelBuilder.Entity<Especialidade>(e =>
             {
-                e.Property(x => x.Nome).HasMaxLength(100).IsRequired();
+                e.Property(x => x.Nome)
+                    .HasMaxLength(100)
+                    .IsRequired()
+                    .UseCollation("Latin1_General_CI_AI");
                 e.HasIndex(x => x.Nome).IsUnique();
+
+                // Carrega o catálogo inicial aprovado (ver docs/especialidades.md). Reexecutar a
+                // migration não duplica nem troca os IDs: o EF só grava a diferença entre esta
+                // lista e o que já existe no histórico de migrations.
+                e.HasData(EspecialidadeCatalogoSeed.Itens);
             });
+
+            // Liga o profissional a uma especialidade do catálogo. O vínculo é opcional e nunca é
+            // apagado em cascata: para remover uma especialidade seria preciso desvincular todos
+            // os profissionais primeiro (não há endpoint de DELETE nesta entrega).
+            modelBuilder.Entity<Profissional>()
+                .HasOne(p => p.Especialidade)
+                .WithMany()
+                .HasForeignKey(p => p.EspecialidadeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Evita apagar avaliações junto com o profissional.
             modelBuilder.Entity<AvaliacaoFisioterapeuta>()

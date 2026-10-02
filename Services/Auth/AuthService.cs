@@ -1,11 +1,13 @@
 using System;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using AgendaiFisio.Constants;
 using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Usuario;
 using AgendaiFisio.Entities;
@@ -15,6 +17,14 @@ namespace AgendaiFisio.Services.Auth
     // Aplica as regras de cadastro, login e criação de tokens.
     public class AuthService : IAuthService 
     {
+        // Papéis que uma conta pode escolher no autocadastro público. "Clinica" (admin) fica de
+        // fora de propósito: só é provisionado por um mecanismo confiável (ver Program.cs).
+        private static readonly string[] TiposPermitidosNoAutocadastro =
+        {
+            PerfilDeUsuario.Paciente,
+            PerfilDeUsuario.Profissional
+        };
+
         private readonly AgendaiFisioDbContext _context;
         private readonly IConfiguration _configuration;
 
@@ -28,10 +38,21 @@ namespace AgendaiFisio.Services.Auth
         // Cadastra o usuário e cria seu perfil inicial.
         public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
         {
+            // Impede que o cadastro público conceda o papel de Clínica (admin) ou qualquer outro
+            // valor fora da lista — sem isso, bastava registrar com TipoUsuario="Clinica" para
+            // ganhar acesso de administrador (ver docs/especialidades.md, achado 2 da revisão).
+            var tipoPermitido = TiposPermitidosNoAutocadastro
+                .Any(t => t.Equals(registroDto.TipoUsuario, StringComparison.OrdinalIgnoreCase));
+
+            if (!tipoPermitido)
+            {
+                throw new InvalidOperationException("Tipo de usuário inválido para autocadastro.");
+            }
+
             // Procura uma conta já cadastrada com o mesmo e-mail.
             var usuarioExistente = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Email == registroDto.Email);
-                
+
             if (usuarioExistente != null)
                 throw new Exception("Já existe um usuário cadastrado com este e-mail.");
 
@@ -77,8 +98,7 @@ namespace AgendaiFisio.Services.Auth
                     NomeCompleto = "Cadastro Pendente",
                     Cpf = string.Empty,
                     Crefito = string.Empty,
-                    Telefone = string.Empty,
-                    Especialidade = string.Empty
+                    Telefone = string.Empty
                 };
                 _context.Profissionais.Add(novoProfissional);
             }
