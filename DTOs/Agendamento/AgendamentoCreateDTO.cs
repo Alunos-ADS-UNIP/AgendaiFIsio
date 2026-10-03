@@ -13,8 +13,11 @@ public class AgendamentoCreateDTO : IAgendamentoValidavel
     [Required(ErrorMessage = "O profissional é obrigatório.")]
     public Guid ProfissionalId { get; set; }
 
-    [Required(ErrorMessage = "A data e hora do agendamento são obrigatórias.")]
-    public DateTime DataHora { get; set; }
+    [Required(ErrorMessage = "A data do agendamento é obrigatória.")]
+    public DateTime Data { get; set; }
+    
+    [Required(ErrorMessage = "A hora do agendamento é obrigatória.")]
+    public DateTime Hora { get; set; }
 
     [StringLength(30, ErrorMessage = "O status deve ter no máximo 30 caracteres.")]
     public string? Status { get; set; }

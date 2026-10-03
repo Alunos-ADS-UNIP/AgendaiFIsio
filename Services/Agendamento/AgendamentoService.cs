@@ -37,7 +37,7 @@ public class AgendamentoService : IAgendamentoService
         {
             var inicioDoDia = data.Value.Date;
             var fimDoDia = inicioDoDia.AddDays(1);
-            query = query.Where(a => a.DataHora >= inicioDoDia && a.DataHora < fimDoDia);
+            query = query.Where(a => a.Data >= inicioDoDia && a.Data < fimDoDia);
         }
 
         if (profissionalId.HasValue)
@@ -50,7 +50,7 @@ public class AgendamentoService : IAgendamentoService
         }
 
         return await query
-            .OrderBy(a => a.DataHora)
+            .OrderBy(a => a.Data)
             .ToListAsync();
     }
 
@@ -71,7 +71,7 @@ public class AgendamentoService : IAgendamentoService
 
         var horarioOcupado = await _context.Agendamentos.AnyAsync(a =>
             a.ProfissionalId == agendamento.ProfissionalId &&
-            a.DataHora == agendamento.DataHora &&
+            a.Hora == agendamento.Hora &&
             a.Status != "Cancelado");
 
         if (horarioOcupado)

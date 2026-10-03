@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Pim4\\AgendaiFIsio\\AgendaiFisio.csproj": {}
+    "/Users/gabrielbarbosa/workspace/PIM/AgendaiFIsio/AgendaiFisio.csproj": {}
   },
   "projects": {
-    "C:\\Pim4\\AgendaiFIsio\\AgendaiFisio.csproj": {
+    "/Users/gabrielbarbosa/workspace/PIM/AgendaiFIsio/AgendaiFisio.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Pim4\\AgendaiFIsio\\AgendaiFisio.csproj",
+        "projectUniqueName": "/Users/gabrielbarbosa/workspace/PIM/AgendaiFIsio/AgendaiFisio.csproj",
         "projectName": "AgendaiFisio",
-        "projectPath": "C:\\Pim4\\AgendaiFIsio\\AgendaiFisio.csproj",
-        "packagesPath": "C:\\Users\\luise\\.nuget\\packages\\",
-        "outputPath": "C:\\Pim4\\AgendaiFIsio\\obj\\",
+        "projectPath": "/Users/gabrielbarbosa/workspace/PIM/AgendaiFIsio/AgendaiFisio.csproj",
+        "packagesPath": "/Users/gabrielbarbosa/.nuget/packages/",
+        "outputPath": "/Users/gabrielbarbosa/workspace/PIM/AgendaiFIsio/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\luise\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "/Users/gabrielbarbosa/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -64,13 +64,17 @@
             },
             "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
-              "version": "[10.0.11, )"
+              "version": "[10.0.12, )"
             },
             "Microsoft.EntityFrameworkCore.Tools": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
               "suppressParent": "All",
               "target": "Package",
-              "version": "[10.0.11, )"
+              "version": "[10.0.12, )"
+            },
+            "Microsoft.OpenApi": {
+              "target": "Package",
+              "version": "[2.7.5, )"
             },
             "Scalar.AspNetCore": {
               "target": "Package",
@@ -96,7 +100,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.202/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

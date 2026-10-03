@@ -54,7 +54,8 @@ namespace AgendaiFisio.Controllers
                 {
                     PacienteId = dto.PacienteId,
                     ProfissionalId = dto.ProfissionalId,
-                    DataHora = dto.DataHora,
+                    Data = dto.Data,
+                    Hora = dto.Hora,
                     Status = dto.Status?.Trim() ?? string.Empty,
                     Observacoes = dto.Observacoes
                 };
@@ -85,7 +86,8 @@ namespace AgendaiFisio.Controllers
                 PacienteNome = agendamento.Paciente?.NomeCompleto ?? string.Empty,
                 ProfissionalId = agendamento.ProfissionalId,
                 ProfissionalNome = agendamento.Profissional?.NomeCompleto ?? string.Empty,
-                DataHora = agendamento.DataHora,
+                Data = agendamento.Data,
+                Hora= agendamento.Hora,
                 Status = agendamento.Status,
                 Observacoes = agendamento.Observacoes
             };

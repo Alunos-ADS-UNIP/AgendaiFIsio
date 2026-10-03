@@ -76,7 +76,7 @@ namespace AgendaiFisio.Context
 
             // Evita dois agendamentos para o mesmo profissional no mesmo horário.
             modelBuilder.Entity<Agendamento>()
-                .HasIndex(a => new { a.ProfissionalId, a.DataHora })
+                .HasIndex(a => new { a.ProfissionalId, a.Hora })
                 .IsUnique()
                 .HasFilter("[Status] <> 'Cancelado'");
         }

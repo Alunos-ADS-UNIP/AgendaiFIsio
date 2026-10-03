@@ -14,7 +14,8 @@ public class Agendamento : IAgendamentoValidavel
     public Guid ProfissionalId { get; set; }
     public virtual Profissional? Profissional { get; set; }
 
-    public DateTime DataHora { get; set; }
+    public DateTime Data { get; set; }
+    public DateTime Hora { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Observacoes { get; set; }
 }

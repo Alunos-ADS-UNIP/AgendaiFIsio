@@ -5,7 +5,8 @@ public interface IAgendamentoValidavel
 {
     Guid PacienteId { get; }
     Guid ProfissionalId { get; }
-    DateTime DataHora { get; }
+    DateTime Data { get; }
+    DateTime Hora { get; }
     string? Status { get; }
 }
 
@@ -45,18 +46,18 @@ public class AgendamentoAttribute : ValidationAttribute
                 new[] { nameof(IAgendamentoValidavel.ProfissionalId) });
         }
 
-        if (agendamento.DataHora == default)
+        if (agendamento.Data == default && agendamento.Data <= DateTime.UtcNow)
         {
             return new ValidationResult(
-                "A data e hora do agendamento são obrigatórias.",
-                new[] { nameof(IAgendamentoValidavel.DataHora) });
+                "A selecionada é inválida.",
+                new[] { nameof(IAgendamentoValidavel.Data) });
         }
 
-        if (agendamento.DataHora <= DateTime.UtcNow)
+        if (agendamento.Hora ==default)
         {
             return new ValidationResult(
-                "O agendamento deve ser marcado para uma data e hora futuras.",
-                new[] { nameof(IAgendamentoValidavel.DataHora) });
+                "A horário desejado deve ser selecionado.",
+                new[] { nameof(IAgendamentoValidavel.Hora) });
         }
 
         if (!string.IsNullOrWhiteSpace(agendamento.Status) &&
