@@ -32,7 +32,7 @@ namespace AgendaiFisio.Controllers
         }
 
         // Busca todos os detalhes de um agendamento específico.
-        [HttpGet("{id:guid}")]
+        [HttpGet("{id:guid}", Name = "ObterAgendamentoPorId")]
         public async Task<ActionResult<AgendamentoResponseDTO>> GetByIdAsync(Guid id)
         {
             var agendamento = await _agendamentoService.GetByIdAsync(id);
@@ -61,8 +61,8 @@ namespace AgendaiFisio.Controllers
 
                 var criado = await _agendamentoService.CreateAsync(agendamento);
 
-                return CreatedAtAction(
-                    nameof(GetByIdAsync),
+                return CreatedAtRoute(
+                    "ObterAgendamentoPorId",
                     new { id = criado.Id },
                     ToResponse(criado));
             }
