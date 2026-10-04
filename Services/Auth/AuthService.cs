@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using AgendaiFisio.Constants;
 using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Usuario;
 using AgendaiFisio.Entities;
@@ -28,10 +29,14 @@ namespace AgendaiFisio.Services.Auth
         // Cadastra o usuário e cria seu perfil inicial.
         public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
         {
-            // Procura uma conta já cadastrada com o mesmo e-mail.
+            // Confere e normaliza o tipo de usuário. "Clinica" (admin) nunca passa por aqui — só é
+            // provisionada por um mecanismo confiável (ver Program.cs). O [TipoUsuarioValido] no
+            // DTO já bloqueia isso no model binding; esta linha é a segunda camada, para quando
+            // o serviço é chamado direto sem passar por ele.
             var tipoUsuario = AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(registroDto.TipoUsuario)
                 ?? throw new ArgumentException("Tipo de usuario invalido. Use Paciente ou Profissional.");
 
+            // Procura uma conta já cadastrada com o mesmo e-mail.
             var usuarioExistente = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Email == registroDto.Email);
 
@@ -80,8 +85,7 @@ namespace AgendaiFisio.Services.Auth
                     NomeCompleto = "Cadastro Pendente",
                     Cpf = string.Empty,
                     Crefito = string.Empty,
-                    Telefone = string.Empty,
-                    Especialidade = string.Empty
+                    Telefone = string.Empty
                 };
                 _context.Profissionais.Add(novoProfissional);
             }

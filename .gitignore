@@ -1,0 +1,15 @@
+# Artefatos de build do .NET — nunca devem ir para o controle de versão.
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Arquivos de usuário/IDE.
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Segredos locais (nunca commitar credenciais reais).
+appsettings.*.local.json
+*.env
