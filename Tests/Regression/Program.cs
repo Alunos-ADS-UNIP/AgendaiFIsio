@@ -37,7 +37,7 @@ async Task<JsonElement> Request(HttpMethod method, string path, object? body, Ht
 object Patient(string cpf, bool address) => address
     ? new { nomeCompleto = prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "10", cep = "01001000", complemento = "Sala 1", bairro = "Centro", cidade = "Sao Paulo", estado = "SP" }
     : new { nomeCompleto = prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "11", cep = "01001000" };
-object Professional(string cpf) => new { nomeCompleto = prefix, cpf, crefito = "T" + Guid.NewGuid().ToString("N")[..12], telefone = "11999999999", dataNascimento = "1990-01-01", especialidade = "Ortopedia", bio = "Teste automatizado", ativo = true };
+object Professional(string cpf) => new { nomeCompleto = prefix, cpf, crefito = "T" + Guid.NewGuid().ToString("N")[..12], telefone = "11999999999", dataNascimento = "1990-01-01", bio = "Teste automatizado", ativo = true };
 Check(await db.Database.CanConnectAsync(), "Banco conectado");
 Check(!(await db.Database.GetPendingMigrationsAsync()).Any(), "Banco sem migracoes pendentes");
 try
@@ -63,6 +63,8 @@ try
     }
     var patientToken = await Login(0);
     var professionalToken = await Login(1);
+    var especialidades = await Request(HttpMethod.Get, "/api/especialidade", null, HttpStatusCode.OK, "Catalogo de especialidades publico");
+    var especialidadeId = especialidades.EnumerateArray().First().GetProperty("id").GetGuid();
     await Request(HttpMethod.Post, "/api/auth/login", new { email = emails[0], senha = "errada" }, HttpStatusCode.Unauthorized, "Senha incorreta rejeitada");
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("11111111111", true), HttpStatusCode.BadRequest, "Rota paciente rejeita CPF invalido", patientToken);
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("11111111111"), HttpStatusCode.BadRequest, "Rota profissional rejeita CPF invalido", professionalToken);
@@ -73,9 +75,12 @@ try
     var patient = await db.Pacientes.AsNoTracking().Include(p => p.Endereco).SingleAsync(p => p.Usuario.Email == emails[0]);
     Check(patient.Endereco.Complemento == "Sala 1" && patient.Endereco.Bairro == "Centro" && patient.Endereco.Cidade == "Sao Paulo" && patient.Endereco.Estado == "SP" && patient.Endereco.Numero == "11", "Endereco preservado no banco");
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725"), HttpStatusCode.OK, "Profissional atualiza perfil", professionalToken);
+    await Request(HttpMethod.Put, "/api/profissional/especialidade", new { especialidadeId }, HttpStatusCode.OK, "Profissional escolhe especialidade apos cadastro", professionalToken);
     var professional = await db.Profissionais.AsNoTracking().SingleAsync(p => p.Usuario.Email == emails[1]);
+    Check(professional.EspecialidadeId == especialidadeId, "Vinculo com especialidade persistido");
     var detail = await Request(HttpMethod.Get, "/api/profissional/" + professional.Id, null, HttpStatusCode.OK, "Detalhe profissional", patientToken);
     Check(!detail.TryGetProperty("cpf", out _) && !detail.TryGetProperty("dataNascimento", out _), "Resposta nao expoe CPF nem nascimento");
+    Check(detail.GetProperty("especialidade").GetProperty("id").GetGuid() == especialidadeId, "Detalhe devolve especialidade escolhida");
     await Request(HttpMethod.Get, "/api/profissional?nome=" + prefix + "&ativo=true&pagina=1&tamanhoPagina=10", null, HttpStatusCode.OK, "Listagem com filtros", patientToken);
     await Request(HttpMethod.Get, "/api/profissional/" + Guid.NewGuid(), null, HttpStatusCode.NotFound, "Profissional inexistente", patientToken);
 }
