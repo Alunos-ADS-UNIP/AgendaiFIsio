@@ -13,5 +13,9 @@ namespace AgendaiFisio.Services.Paciente
         Task<Entities.Paciente?> GetPacienteByIdAsync(Guid id);
           // Atualiza os dados do paciente.
         Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto);
+
+        // Retorna agendamentos passados do paciente para ele próprio ou para um profissional vinculado.
+        Task<IReadOnlyList<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
+            Guid pacienteId, Guid usuarioId, string tipoUsuario);
     }
 }

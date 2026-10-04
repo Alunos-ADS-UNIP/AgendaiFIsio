@@ -61,6 +61,9 @@ try
         var result = await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[i], senha = "Regression123!", tipoUsuario = i == 0 ? " paciente " : "pRoFiSsIoNaL" }, HttpStatusCode.OK, "Cadastro com normalizacao");
         Check(result.GetProperty("dados").GetProperty("tipoUsuario").GetString() == (i == 0 ? "Paciente" : "Profissional"), "Papel canonico persistido");
     }
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new { email = emails[2], senha = "Regression123!", tipoUsuario = "Paciente" },
+        HttpStatusCode.OK, "Cadastro de segundo paciente para isolar a agenda");
     async Task<string> Login(int index)
     {
         var result = await Request(HttpMethod.Post, "/api/auth/login", new { email = emails[index], senha = "Regression123!" }, HttpStatusCode.OK, "Login");
@@ -68,6 +71,7 @@ try
     }
     var patientToken = await Login(0);
     var professionalToken = await Login(1);
+    var segundoPacienteToken = await Login(2);
     var adminLogin = await Request(HttpMethod.Post, "/api/auth/login", new { email = adminEmail, senha = adminSenha }, HttpStatusCode.OK, "Login da Clinica");
     var adminToken = adminLogin.GetProperty("token").GetString()!;
     var especialidades = await Request(HttpMethod.Get, "/api/especialidade", null, HttpStatusCode.OK, "Catalogo de especialidades publico");
@@ -103,6 +107,16 @@ try
     await Request(HttpMethod.Get, "/api/profissional?nome=" + prefix + "&ativo=true&pagina=1&tamanhoPagina=10", null, HttpStatusCode.OK, "Listagem com filtros", patientToken);
     await Request(HttpMethod.Get, "/api/profissional/" + Guid.NewGuid(), null, HttpStatusCode.NotFound, "Profissional inexistente", patientToken);
 
+    var rotaHistorico = "/api/paciente/" + patient.Id + "/historico-consultas";
+    await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Unauthorized, "Historico exige login");
+    await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Forbidden, "Clinica nao acessa historico clinico", adminToken);
+    await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Forbidden, "Profissional sem agendamento nao acessa historico", professionalToken);
+    await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Forbidden, "Outro paciente nao acessa historico", segundoPacienteToken);
+    var historicoInicial = await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.OK, "Paciente consulta o proprio historico", patientToken);
+    Check(historicoInicial.GetArrayLength() == 0, "Historico vazio retorna lista vazia");
+    await Request(HttpMethod.Get, "/api/paciente/" + Guid.NewGuid() + "/historico-consultas", null,
+        HttpStatusCode.NotFound, "Historico de paciente inexistente", patientToken);
+
     await Request(HttpMethod.Get, "/api/agendamento", null, HttpStatusCode.Unauthorized, "Agenda exige autenticacao");
     var horario = DateTime.UtcNow.AddDays(10);
     await Request(HttpMethod.Post, "/api/agendamento", new { pacienteId = patient.Id, profissionalId = professional.Id, dataHora = DateTime.UtcNow.AddMinutes(-5), status = "Agendado" }, HttpStatusCode.BadRequest, "Agenda rejeita horario passado", patientToken);
@@ -112,6 +126,36 @@ try
     var agendamento = await Request(HttpMethod.Post, "/api/agendamento", new { pacienteId = patient.Id, profissionalId = professional.Id, dataHora = horario, observacoes = "Teste de regressao" }, HttpStatusCode.Created, "Paciente cria agendamento", patientToken);
     var agendamentoId = agendamento.GetProperty("id").GetGuid();
     Check(agendamento.GetProperty("status").GetString() == "Agendado", "Status padrao do agendamento");
+    var historicoAntesDaConsulta = await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.OK,
+        "Profissional com agendamento consulta historico", professionalToken);
+    Check(historicoAntesDaConsulta.GetArrayLength() == 0, "Agendamento futuro nao aparece no historico");
+
+    var consultaAntiga = new AgendaiFisio.Entities.Agendamento
+    {
+        PacienteId = patient.Id, ProfissionalId = professional.Id,
+        DataHora = DateTime.UtcNow.AddDays(-3), Status = "Concluido"
+    };
+    var consultaRecente = new AgendaiFisio.Entities.Agendamento
+    {
+        PacienteId = patient.Id, ProfissionalId = professional.Id,
+        DataHora = DateTime.UtcNow.AddDays(-1), Status = "Cancelado"
+    };
+    db.Agendamentos.AddRange(consultaAntiga, consultaRecente);
+    await db.SaveChangesAsync();
+
+    var historico = await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.OK,
+        "Paciente consulta agendamentos passados", patientToken);
+    Check(historico.GetArrayLength() == 2, "Historico inclui status passados e exclui futuro");
+    Check(historico[0].GetProperty("agendamentoId").GetGuid() == consultaRecente.Id &&
+        historico[0].GetProperty("status").GetString() == "Cancelado" &&
+        historico[1].GetProperty("agendamentoId").GetGuid() == consultaAntiga.Id &&
+        historico[1].GetProperty("status").GetString() == "Concluido", "Historico ordenado do mais recente ao mais antigo");
+    Check(historico[0].GetProperty("profissionalId").GetGuid() == professional.Id &&
+        historico[0].GetProperty("profissionalNome").GetString() == professional.NomeCompleto &&
+        historico[0].TryGetProperty("dataHora", out _), "Historico informa data e profissional");
+    var historicoDoProfissional = await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.OK,
+        "Profissional consulta historico do paciente agendado", professionalToken);
+    Check(historicoDoProfissional.GetArrayLength() == 2, "Profissional ve os agendamentos passados do paciente");
     await Request(HttpMethod.Get, "/api/agendamento/" + agendamentoId, null, HttpStatusCode.OK, "Consulta agendamento por id", patientToken);
     await Request(HttpMethod.Get, "/api/agendamento/" + Guid.NewGuid(), null, HttpStatusCode.NotFound, "Agendamento inexistente", patientToken);
     var dataFiltro = Uri.EscapeDataString(horario.ToString("yyyy-MM-dd"));

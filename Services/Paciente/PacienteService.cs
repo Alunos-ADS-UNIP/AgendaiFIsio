@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Paciente;
 using AgendaiFisio.Entities;
+using AgendaiFisio.Constants;
 
 namespace AgendaiFisio.Services.Paciente
 {
@@ -66,6 +67,46 @@ namespace AgendaiFisio.Services.Paciente
             await _context.SaveChangesAsync();
 
             return true;
+        }
+
+        // Consulta somente agendamentos passados. O status armazenado é exibido sem presumir
+        // que um horário passado foi concluído.
+        public async Task<IReadOnlyList<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
+            Guid pacienteId, Guid usuarioId, string tipoUsuario)
+        {
+            var pacienteExiste = await _context.Pacientes.AsNoTracking()
+                .AnyAsync(p => p.Id == pacienteId);
+
+            if (!pacienteExiste)
+                throw new KeyNotFoundException("Paciente não encontrado.");
+
+            var podeConsultar = tipoUsuario switch
+            {
+                PerfilDeUsuario.Paciente => await _context.Pacientes.AsNoTracking()
+                    .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == usuarioId),
+                PerfilDeUsuario.Profissional => await _context.Agendamentos.AsNoTracking()
+                    .AnyAsync(a => a.PacienteId == pacienteId &&
+                        a.Profissional!.UsuarioId == usuarioId && a.Status != "Cancelado"),
+                _ => false
+            };
+
+            if (!podeConsultar)
+                throw new UnauthorizedAccessException("Você não pode consultar o histórico deste paciente.");
+
+            var agora = DateTime.UtcNow;
+            return await _context.Agendamentos.AsNoTracking()
+                .Where(a => a.PacienteId == pacienteId && a.DataHora <= agora)
+                .OrderByDescending(a => a.DataHora)
+                .ThenByDescending(a => a.Id)
+                .Select(a => new HistoricoConsultaDTO
+                {
+                    AgendamentoId = a.Id,
+                    DataHora = a.DataHora,
+                    ProfissionalId = a.ProfissionalId,
+                    ProfissionalNome = a.Profissional!.NomeCompleto,
+                    Status = a.Status
+                })
+                .ToListAsync();
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using AgendaiFisio.DTOs.Paciente;
 using AgendaiFisio.Services.Paciente;
+using AgendaiFisio.Constants;
 
 namespace AgendaiFisio.Controllers
 {
@@ -54,6 +55,37 @@ namespace AgendaiFisio.Controllers
             {
                 // Devolve ao cliente o erro ocorrido no processamento.
                 return BadRequest(new { erro = ex.Message });
+            }
+        }
+
+        // Exibe consultas passadas para o próprio paciente ou para o fisioterapeuta que tenha
+        // um agendamento não cancelado com ele (inclusive o atendimento futuro em preparação).
+        [HttpGet("{pacienteId:guid}/historico-consultas")]
+        [Authorize(Roles = PerfilDeUsuario.Paciente + "," + PerfilDeUsuario.Profissional)]
+        public async Task<ActionResult<IReadOnlyList<HistoricoConsultaDTO>>> ListarHistoricoConsultasAsync(
+            Guid pacienteId)
+        {
+            var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(usuarioIdClaim, out var usuarioId))
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            var tipoUsuario = User.IsInRole(PerfilDeUsuario.Paciente)
+                ? PerfilDeUsuario.Paciente
+                : PerfilDeUsuario.Profissional;
+
+            try
+            {
+                var historico = await _pacienteService.ListarHistoricoConsultasAsync(
+                    pacienteId, usuarioId, tipoUsuario);
+                return Ok(historico);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
             }
         }
     }
