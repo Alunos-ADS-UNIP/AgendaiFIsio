@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using AgendaiFisio.Validations;
+using System.Text.Json.Serialization;
 
 namespace AgendaiFisio.DTOs.Agendamento;
 
@@ -14,6 +15,7 @@ public class AgendamentoCreateDTO : IAgendamentoValidavel
     public Guid ProfissionalId { get; set; }
 
     [Required(ErrorMessage = "A data e hora do agendamento são obrigatórias.")]
+    [JsonConverter(typeof(DataHoraUtcJsonConverter))]
     public DateTime DataHora { get; set; }
 
     [StringLength(30, ErrorMessage = "O status deve ter no máximo 30 caracteres.")]

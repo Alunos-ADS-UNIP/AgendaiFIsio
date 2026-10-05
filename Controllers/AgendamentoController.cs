@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Agendamento;
+using AgendaiFisio.Constants;
+using System.Security.Claims;
 
 namespace AgendaiFisio.Controllers
 {
@@ -23,7 +25,12 @@ namespace AgendaiFisio.Controllers
         public async Task<ActionResult<IReadOnlyList<AgendamentoResponseDTO>>> ListAsync(
             [FromQuery] AgendamentoFilterDTO filtros)
         {
+            if (!TryGetUsuario(out var usuarioId, out var tipoUsuario))
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
             var agendamentos = await _agendamentoService.ListAsync(
+                usuarioId,
+                tipoUsuario,
                 filtros.Data,
                 filtros.ProfissionalId,
                 filtros.Status);
@@ -35,7 +42,10 @@ namespace AgendaiFisio.Controllers
         [HttpGet("{id:guid}", Name = "ObterAgendamentoPorId")]
         public async Task<ActionResult<AgendamentoResponseDTO>> GetByIdAsync(Guid id)
         {
-            var agendamento = await _agendamentoService.GetByIdAsync(id);
+            if (!TryGetUsuario(out var usuarioId, out var tipoUsuario))
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            var agendamento = await _agendamentoService.GetByIdAsync(id, usuarioId, tipoUsuario);
 
             if (agendamento == null)
                 return NotFound(new { erro = "Agendamento não encontrado." });
@@ -45,9 +55,13 @@ namespace AgendaiFisio.Controllers
 
         // Reserva um horário para um paciente com um profissional.
         [HttpPost]
+        [Authorize(Roles = PerfilDeUsuario.Paciente + "," + PerfilDeUsuario.Admin)]
         public async Task<ActionResult<AgendamentoResponseDTO>> CreateAsync(
             [FromBody] AgendamentoCreateDTO dto)
         {
+            if (!TryGetUsuario(out var usuarioId, out var tipoUsuario))
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
             try
             {
                 var agendamento = new Entities.Agendamento
@@ -59,7 +73,7 @@ namespace AgendaiFisio.Controllers
                     Observacoes = dto.Observacoes
                 };
 
-                var criado = await _agendamentoService.CreateAsync(agendamento);
+                var criado = await _agendamentoService.CreateAsync(agendamento, usuarioId, tipoUsuario);
 
                 return CreatedAtRoute(
                     "ObterAgendamentoPorId",
@@ -74,6 +88,24 @@ namespace AgendaiFisio.Controllers
             {
                 return Conflict(new { erro = ex.Message });
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+        }
+
+        private bool TryGetUsuario(out Guid usuarioId, out string tipoUsuario)
+        {
+            var idValido = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out usuarioId);
+            tipoUsuario = User.IsInRole(PerfilDeUsuario.Paciente) ? PerfilDeUsuario.Paciente
+                : User.IsInRole(PerfilDeUsuario.Profissional) ? PerfilDeUsuario.Profissional
+                : User.IsInRole(PerfilDeUsuario.Admin) ? PerfilDeUsuario.Admin
+                : string.Empty;
+            return idValido && tipoUsuario.Length > 0;
         }
 
         private static AgendamentoResponseDTO ToResponse(Entities.Agendamento agendamento)
@@ -85,7 +117,7 @@ namespace AgendaiFisio.Controllers
                 PacienteNome = agendamento.Paciente?.NomeCompleto ?? string.Empty,
                 ProfissionalId = agendamento.ProfissionalId,
                 ProfissionalNome = agendamento.Profissional?.NomeCompleto ?? string.Empty,
-                DataHora = agendamento.DataHora,
+                DataHora = DateTime.SpecifyKind(agendamento.DataHora, DateTimeKind.Utc),
                 Status = agendamento.Status,
                 Observacoes = agendamento.Observacoes
             };
