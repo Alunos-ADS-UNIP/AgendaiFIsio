@@ -5,6 +5,9 @@ using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Paciente;
 using AgendaiFisio.Entities;
 using AgendaiFisio.Constants;
+using AgendaiFisio.DTOs;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AgendaiFisio.Services.Paciente
 {
@@ -12,11 +15,13 @@ namespace AgendaiFisio.Services.Paciente
     public class PacienteService : IPacienteService
     {
         private readonly AgendaiFisioDbContext _context;
+        private readonly ILogger<PacienteService> _logger;
 
         // Guarda o banco usado pelo serviço.
-        public PacienteService(AgendaiFisioDbContext context)
+        public PacienteService(AgendaiFisioDbContext context, ILogger<PacienteService>? logger = null)
         {
             _context = context;
+            _logger = logger ?? NullLogger<PacienteService>.Instance;
         }
 
         // Busca um paciente e seu endereço pelo identificador.
@@ -71,15 +76,9 @@ namespace AgendaiFisio.Services.Paciente
 
         // Consulta somente agendamentos passados. O status armazenado é exibido sem presumir
         // que um horário passado foi concluído.
-        public async Task<IReadOnlyList<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
-            Guid pacienteId, Guid usuarioId, string tipoUsuario)
+        public async Task<PagedResultDTO<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
+            Guid pacienteId, Guid usuarioId, string tipoUsuario, HistoricoConsultaFiltroDTO filtro)
         {
-            var pacienteExiste = await _context.Pacientes.AsNoTracking()
-                .AnyAsync(p => p.Id == pacienteId);
-
-            if (!pacienteExiste)
-                throw new KeyNotFoundException("Paciente não encontrado.");
-
             var podeConsultar = tipoUsuario switch
             {
                 PerfilDeUsuario.Paciente => await _context.Pacientes.AsNoTracking()
@@ -91,22 +90,49 @@ namespace AgendaiFisio.Services.Paciente
             };
 
             if (!podeConsultar)
-                throw new UnauthorizedAccessException("Você não pode consultar o histórico deste paciente.");
+            {
+                var pacienteExiste = await _context.Pacientes.AsNoTracking()
+                    .AnyAsync(p => p.Id == pacienteId);
+                _logger.LogInformation(
+                    "Histórico não encontrado ou acesso negado. PacienteExiste={PacienteExiste}, TipoUsuario={TipoUsuario}",
+                    pacienteExiste, tipoUsuario);
+                throw new KeyNotFoundException("Histórico de consultas não encontrado.");
+            }
 
             var agora = DateTime.UtcNow;
-            return await _context.Agendamentos.AsNoTracking()
-                .Where(a => a.PacienteId == pacienteId && a.DataHora <= agora)
-                .OrderByDescending(a => a.DataHora)
-                .ThenByDescending(a => a.Id)
-                .Select(a => new HistoricoConsultaDTO
-                {
-                    AgendamentoId = a.Id,
-                    DataHora = a.DataHora,
-                    ProfissionalId = a.ProfissionalId,
-                    ProfissionalNome = a.Profissional!.NomeCompleto,
-                    Status = a.Status
-                })
-                .ToListAsync();
+            var consulta = _context.Agendamentos.AsNoTracking()
+                .Where(a => a.PacienteId == pacienteId && a.DataHora <= agora);
+            var totalRegistros = await consulta.CountAsync();
+            var deslocamento = ((long)filtro.Pagina - 1) * filtro.TamanhoPagina;
+
+            var itens = deslocamento >= totalRegistros
+                ? new List<HistoricoConsultaDTO>()
+                : await consulta
+                    .OrderByDescending(a => a.DataHora)
+                    .ThenByDescending(a => a.Id)
+                    .Skip((int)deslocamento)
+                    .Take(filtro.TamanhoPagina)
+                    .Select(a => new HistoricoConsultaDTO
+                    {
+                        AgendamentoId = a.Id,
+                        DataHora = a.DataHora,
+                        ProfissionalId = a.ProfissionalId,
+                        ProfissionalNome = a.Profissional!.NomeCompleto,
+                        Status = a.Status
+                    })
+                    .ToListAsync();
+
+            // SQL Server datetime2 não conserva DateTime.Kind; os horários persistidos são UTC.
+            foreach (var item in itens)
+                item.DataHora = DateTime.SpecifyKind(item.DataHora, DateTimeKind.Utc);
+
+            return new PagedResultDTO<HistoricoConsultaDTO>
+            {
+                Itens = itens,
+                TotalRegistros = totalRegistros,
+                PaginaAtual = filtro.Pagina,
+                TamanhoPagina = filtro.TamanhoPagina
+            };
         }
     }
 }

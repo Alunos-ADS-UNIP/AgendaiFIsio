@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AgendaiFisio.DTOs.Paciente;
+using AgendaiFisio.DTOs;
 
 namespace AgendaiFisio.Services.Paciente
 {
@@ -15,7 +16,7 @@ namespace AgendaiFisio.Services.Paciente
         Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto);
 
         // Retorna agendamentos passados do paciente para ele próprio ou para um profissional vinculado.
-        Task<IReadOnlyList<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
-            Guid pacienteId, Guid usuarioId, string tipoUsuario);
+        Task<PagedResultDTO<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
+            Guid pacienteId, Guid usuarioId, string tipoUsuario, HistoricoConsultaFiltroDTO filtro);
     }
 }

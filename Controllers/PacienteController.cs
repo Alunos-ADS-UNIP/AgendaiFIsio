@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using AgendaiFisio.DTOs.Paciente;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Constants;
+using AgendaiFisio.DTOs;
 
 namespace AgendaiFisio.Controllers
 {
@@ -62,8 +63,8 @@ namespace AgendaiFisio.Controllers
         // um agendamento não cancelado com ele (inclusive o atendimento futuro em preparação).
         [HttpGet("{pacienteId:guid}/historico-consultas")]
         [Authorize(Roles = PerfilDeUsuario.Paciente + "," + PerfilDeUsuario.Profissional)]
-        public async Task<ActionResult<IReadOnlyList<HistoricoConsultaDTO>>> ListarHistoricoConsultasAsync(
-            Guid pacienteId)
+        public async Task<ActionResult<PagedResultDTO<HistoricoConsultaDTO>>> ListarHistoricoConsultasAsync(
+            Guid pacienteId, [FromQuery] HistoricoConsultaFiltroDTO filtro)
         {
             var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!Guid.TryParse(usuarioIdClaim, out var usuarioId))
@@ -76,16 +77,12 @@ namespace AgendaiFisio.Controllers
             try
             {
                 var historico = await _pacienteService.ListarHistoricoConsultasAsync(
-                    pacienteId, usuarioId, tipoUsuario);
+                    pacienteId, usuarioId, tipoUsuario, filtro);
                 return Ok(historico);
             }
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { erro = ex.Message });
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return Forbid();
             }
         }
     }

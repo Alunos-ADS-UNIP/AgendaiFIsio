@@ -106,6 +106,10 @@ namespace AgendaiFisio.Context
                 .HasIndex(a => new { a.ProfissionalId, a.DataHora })
                 .IsUnique()
                 .HasFilter("[Status] <> 'Cancelado'");
+
+            // Sustenta a paginação do histórico de consultas de um paciente por data.
+            modelBuilder.Entity<Agendamento>()
+                .HasIndex(a => new { a.PacienteId, a.DataHora });
         }
         
     }
