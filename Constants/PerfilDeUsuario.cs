@@ -15,6 +15,12 @@ namespace AgendaiFisio.Constants
             return null;
         }
 
+        public static string? NormalizarAutenticado(string? valor)
+        {
+            if (string.Equals(valor?.Trim(), Admin, StringComparison.OrdinalIgnoreCase)) return Admin;
+            return NormalizarCadastro(valor);
+        }
+
         public const string Admin = "Clinica";
         public const string Paciente = "Paciente";
         public const string Profissional = "Profissional";

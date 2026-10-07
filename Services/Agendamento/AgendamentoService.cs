@@ -57,29 +57,23 @@ public class AgendamentoService : IAgendamentoService
             .ToListAsync();
     }
 
-    // Confere as entidades envolvidas e reserva o horário quando ele está disponível.
-    public async Task<Entities.Agendamento> CreateAsync(
-        Entities.Agendamento agendamento, Guid usuarioId, string tipoUsuario)
+    // Cria um agendamento usando exclusivamente o perfil assinado no token do paciente.
+    public Task<Entities.Agendamento> CreateForPatientAsync(
+        Entities.Agendamento agendamento,
+        Guid pacienteId)
     {
-        if (tipoUsuario != PerfilDeUsuario.Paciente && tipoUsuario != PerfilDeUsuario.Admin)
-            throw new UnauthorizedAccessException("Você não pode criar agendamentos.");
+        agendamento.PacienteId = pacienteId;
+        return ValidateAndCreateAsync(agendamento);
+    }
 
-        if (tipoUsuario == PerfilDeUsuario.Paciente)
-        {
-            var pacienteDoToken = await _context.Pacientes.AsNoTracking()
-                .Where(p => p.UsuarioId == usuarioId)
-                .Select(p => p.Id)
-                .FirstOrDefaultAsync();
+    // Fluxo separado para a Clínica operar em nome de um paciente explícito.
+    public Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento)
+        => ValidateAndCreateAsync(agendamento);
 
-            if (pacienteDoToken == Guid.Empty)
-                throw new KeyNotFoundException("Perfil de paciente não encontrado.");
-
-            if (agendamento.PacienteId != pacienteDoToken)
-                throw new UnauthorizedAccessException("Você só pode agendar para seu próprio perfil.");
-
-            // O identificador usado na gravação vem do token, não do corpo da requisição.
-            agendamento.PacienteId = pacienteDoToken;
-        }
+    // Confere as entidades envolvidas e reserva o horário quando ele está disponível.
+    private async Task<Entities.Agendamento> ValidateAndCreateAsync(
+        Entities.Agendamento agendamento)
+    {
 
         if (agendamento.DataHora.Kind != DateTimeKind.Utc)
             throw new ArgumentException("A data e hora do agendamento devem estar em UTC.");

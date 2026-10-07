@@ -13,5 +13,9 @@ public interface IAgendamentoService
         Guid? profissionalId = null,
         string? status = null);
 
-    Task<Entities.Agendamento> CreateAsync(Entities.Agendamento agendamento, Guid usuarioId, string tipoUsuario);
+    Task<Entities.Agendamento> CreateForPatientAsync(
+        Entities.Agendamento agendamento,
+        Guid pacienteId);
+
+    Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento);
 }

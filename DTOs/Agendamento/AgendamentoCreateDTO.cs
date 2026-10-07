@@ -8,9 +8,6 @@ namespace AgendaiFisio.DTOs.Agendamento;
 [Agendamento]
 public class AgendamentoCreateDTO : IAgendamentoValidavel
 {
-    [Required(ErrorMessage = "O paciente é obrigatório.")]
-    public Guid PacienteId { get; set; }
-
     [Required(ErrorMessage = "O profissional é obrigatório.")]
     public Guid ProfissionalId { get; set; }
 

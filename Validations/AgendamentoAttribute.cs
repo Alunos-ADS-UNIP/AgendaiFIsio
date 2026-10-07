@@ -3,10 +3,14 @@ namespace AgendaiFisio.Validations;
 
 public interface IAgendamentoValidavel
 {
-    Guid PacienteId { get; }
     Guid ProfissionalId { get; }
     DateTime DataHora { get; }
     string? Status { get; }
+}
+
+public interface IAgendamentoComPaciente
+{
+    Guid PacienteId { get; }
 }
 
 // Valida os dados que podem ser conferidos sem consultar o banco de dados.
@@ -31,11 +35,12 @@ public class AgendamentoAttribute : ValidationAttribute
         if (value is not IAgendamentoValidavel agendamento)
             return new ValidationResult(ErrorMessage);
 
-        if (agendamento.PacienteId == Guid.Empty)
+        if (value is IAgendamentoComPaciente agendamentoComPaciente &&
+            agendamentoComPaciente.PacienteId == Guid.Empty)
         {
             return new ValidationResult(
                 "O paciente é obrigatório.",
-                new[] { nameof(IAgendamentoValidavel.PacienteId) });
+                new[] { nameof(IAgendamentoComPaciente.PacienteId) });
         }
 
         if (agendamento.ProfissionalId == Guid.Empty)

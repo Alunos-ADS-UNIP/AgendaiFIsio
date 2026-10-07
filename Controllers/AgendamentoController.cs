@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Agendamento;
+using AgendaiFisio.Services.Auth;
 using AgendaiFisio.Constants;
-using System.Security.Claims;
 
 namespace AgendaiFisio.Controllers
 {
@@ -14,10 +14,14 @@ namespace AgendaiFisio.Controllers
     public class AgendamentoController : ControllerBase
     {
         private readonly IAgendamentoService _agendamentoService;
+        private readonly IUsuarioAtualService _usuarioAtualService;
 
-        public AgendamentoController(IAgendamentoService agendamentoService)
+        public AgendamentoController(
+            IAgendamentoService agendamentoService,
+            IUsuarioAtualService usuarioAtualService)
         {
             _agendamentoService = agendamentoService;
+            _usuarioAtualService = usuarioAtualService;
         }
 
         // Lista agendamentos e aplica os filtros informados na consulta.
@@ -25,12 +29,13 @@ namespace AgendaiFisio.Controllers
         public async Task<ActionResult<IReadOnlyList<AgendamentoResponseDTO>>> ListAsync(
             [FromQuery] AgendamentoFilterDTO filtros)
         {
-            if (!TryGetUsuario(out var usuarioId, out var tipoUsuario))
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
                 return Unauthorized(new { erro = "Usuário não identificado no token." });
 
             var agendamentos = await _agendamentoService.ListAsync(
-                usuarioId,
-                tipoUsuario,
+                usuarioAtual.UsuarioId,
+                usuarioAtual.TipoUsuario,
                 filtros.Data,
                 filtros.ProfissionalId,
                 filtros.Status);
@@ -42,10 +47,14 @@ namespace AgendaiFisio.Controllers
         [HttpGet("{id:guid}", Name = "ObterAgendamentoPorId")]
         public async Task<ActionResult<AgendamentoResponseDTO>> GetByIdAsync(Guid id)
         {
-            if (!TryGetUsuario(out var usuarioId, out var tipoUsuario))
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
                 return Unauthorized(new { erro = "Usuário não identificado no token." });
 
-            var agendamento = await _agendamentoService.GetByIdAsync(id, usuarioId, tipoUsuario);
+            var agendamento = await _agendamentoService.GetByIdAsync(
+                id,
+                usuarioAtual.UsuarioId,
+                usuarioAtual.TipoUsuario);
 
             if (agendamento == null)
                 return NotFound(new { erro = "Agendamento não encontrado." });
@@ -53,27 +62,28 @@ namespace AgendaiFisio.Controllers
             return Ok(ToResponse(agendamento));
         }
 
-        // Reserva um horário para um paciente com um profissional.
+        // Reserva um horário para o próprio paciente autenticado.
         [HttpPost]
-        [Authorize(Roles = PerfilDeUsuario.Paciente + "," + PerfilDeUsuario.Admin)]
+        [Authorize(Roles = PerfilDeUsuario.Paciente)]
         public async Task<ActionResult<AgendamentoResponseDTO>> CreateAsync(
             [FromBody] AgendamentoCreateDTO dto)
         {
-            if (!TryGetUsuario(out var usuarioId, out var tipoUsuario))
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual?.PerfilId is not Guid pacienteId)
                 return Unauthorized(new { erro = "Usuário não identificado no token." });
 
             try
             {
                 var agendamento = new Entities.Agendamento
                 {
-                    PacienteId = dto.PacienteId,
+                    PacienteId = pacienteId,
                     ProfissionalId = dto.ProfissionalId,
                     DataHora = dto.DataHora,
                     Status = dto.Status?.Trim() ?? string.Empty,
                     Observacoes = dto.Observacoes
                 };
 
-                var criado = await _agendamentoService.CreateAsync(agendamento, usuarioId, tipoUsuario);
+                var criado = await _agendamentoService.CreateForPatientAsync(agendamento, pacienteId);
 
                 return CreatedAtRoute(
                     "ObterAgendamentoPorId",
@@ -92,20 +102,47 @@ namespace AgendaiFisio.Controllers
             {
                 return BadRequest(new { erro = ex.Message });
             }
-            catch (UnauthorizedAccessException)
-            {
-                return Forbid();
-            }
         }
 
-        private bool TryGetUsuario(out Guid usuarioId, out string tipoUsuario)
+        // Permite à Clínica agendar em nome de um paciente explicitamente informado.
+        [HttpPost("administrativo")]
+        [Authorize(Roles = PerfilDeUsuario.Admin)]
+        public async Task<ActionResult<AgendamentoResponseDTO>> CreateForAdminAsync(
+            [FromBody] AgendamentoAdminCreateDTO dto)
         {
-            var idValido = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out usuarioId);
-            tipoUsuario = User.IsInRole(PerfilDeUsuario.Paciente) ? PerfilDeUsuario.Paciente
-                : User.IsInRole(PerfilDeUsuario.Profissional) ? PerfilDeUsuario.Profissional
-                : User.IsInRole(PerfilDeUsuario.Admin) ? PerfilDeUsuario.Admin
-                : string.Empty;
-            return idValido && tipoUsuario.Length > 0;
+            if (_usuarioAtualService.Obter() is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                var agendamento = new Entities.Agendamento
+                {
+                    PacienteId = dto.PacienteId,
+                    ProfissionalId = dto.ProfissionalId,
+                    DataHora = dto.DataHora,
+                    Status = dto.Status?.Trim() ?? string.Empty,
+                    Observacoes = dto.Observacoes
+                };
+
+                var criado = await _agendamentoService.CreateForAdminAsync(agendamento);
+
+                return CreatedAtRoute(
+                    "ObterAgendamentoPorId",
+                    new { id = criado.Id },
+                    ToResponse(criado));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { erro = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
         }
 
         private static AgendamentoResponseDTO ToResponse(Entities.Agendamento agendamento)

@@ -32,6 +32,36 @@ namespace AgendaiFisio.Services.Paciente
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
+        // Projeta apenas o perfil associado ao identificador assinado no JWT.
+        public async Task<PacienteMeResponseDTO?> ObterMeuPerfilAsync(Guid pacienteId)
+        {
+            return await _context.Pacientes.AsNoTracking()
+                .Where(p => p.Id == pacienteId)
+                .Select(p => new PacienteMeResponseDTO
+                {
+                    Id = p.Id,
+                    UsuarioId = p.UsuarioId,
+                    Email = p.Usuario.Email,
+                    NomeCompleto = p.NomeCompleto,
+                    Cpf = p.Cpf,
+                    Telefone = p.Telefone,
+                    DataNascimento = p.DataNascimento,
+                    Sexo = p.Sexo,
+                    EstadoCivil = p.EstadoCivil,
+                    Endereco = new EnderecoPacienteDTO
+                    {
+                        Rua = p.Endereco.Rua,
+                        Numero = p.Endereco.Numero,
+                        Complemento = p.Endereco.Complemento,
+                        Cep = p.Endereco.Cep,
+                        Bairro = p.Endereco.Bairro,
+                        Cidade = p.Endereco.Cidade,
+                        Estado = p.Endereco.Estado
+                    }
+                })
+                .FirstOrDefaultAsync();
+        }
+
         // Atualiza os dados pessoais e o endereço do paciente.
         public async Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto)
         {
@@ -56,13 +86,13 @@ namespace AgendaiFisio.Services.Paciente
                 paciente.Endereco = new Endereco();
             }
 
-            
+
             paciente.Endereco.Rua = dto.Rua;
             paciente.Endereco.Numero = dto.Numero;
             paciente.Endereco.Cep = dto.Cep;
-            
-            
-           
+
+
+
             if (dto.Complemento is not null) paciente.Endereco.Complemento = dto.Complemento.Trim();
             if (dto.Bairro is not null) paciente.Endereco.Bairro = dto.Bairro.Trim();
             if (dto.Cidade is not null) paciente.Endereco.Cidade = dto.Cidade.Trim();

@@ -10,7 +10,7 @@ namespace AgendaiFisio.Services.Auth
     public interface IAuthService
     {
         // Confere os dados e realiza o login.
-        Task<string> RealizarLoginAsync(UsuarioLoginDTO loginDTO);
+        Task<LoginResponseDTO> RealizarLoginAsync(UsuarioLoginDTO loginDTO);
         // Cria uma nova conta de usuário.
         Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto);
     }

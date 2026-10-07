@@ -11,6 +11,7 @@ using AgendaiFisio.Services.Especialidade;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Services.Profissional;
 using AgendaiFisio.Services.Agendamento;
+using AgendaiFisio.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,8 @@ builder.Services.AddDbContext<AgendaiFisioDbContext>(options =>
 
 // Registra os serviços usados pela aplicação.
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUsuarioAtualService, UsuarioAtualService>();
 builder.Services.AddScoped<IPacienteService, PacienteService>();
 builder.Services.AddScoped<IProfissionalService, ProfissionalService>();
 builder.Services.AddScoped<IEspecialidadeService, EspecialidadeService>();
@@ -36,6 +39,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    options.MapInboundClaims = false;
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
@@ -47,23 +51,32 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidAudience = jwtSettings.GetValue<string>("Audience"),
         ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
+        ClockSkew = TimeSpan.Zero,
+        NameClaimType = JwtClaimNames.Subject,
+        RoleClaimType = JwtClaimNames.Role
     };
 });
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// Ativa a documentação da API.
-builder.Services.AddOpenApi();
+// Ativa a documentação e descreve quais operações usam o JWT Bearer.
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddOperationTransformer<AuthOperationTransformer>();
+});
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    // Exibe a documentação enquanto o sistema está em desenvolvimento.
-    app.MapOpenApi(); 
-    app.MapScalarApiReference(); 
+    // Exibe a documentação e seu script de autenticação somente em desenvolvimento.
+    app.UseStaticFiles();
+    app.MapOpenApi();
+    app.MapScalarApiReference(options => options
+        .AddPreferredSecuritySchemes(BearerSecuritySchemeTransformer.SchemeName)
+        .WithJavaScriptConfiguration("/scalar-config.js"));
 }
 
 app.UseHttpsRedirection();

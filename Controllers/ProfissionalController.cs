@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using AgendaiFisio.DTOs.Profissional;
 using AgendaiFisio.Services.Profissional;
+using AgendaiFisio.Services.Auth;
 
 namespace AgendaiFisio.Controllers
 {
@@ -18,12 +18,17 @@ namespace AgendaiFisio.Controllers
     {
         private readonly IProfissionalService _profissionalService;
         private readonly ILogger<ProfissionalController> _logger;
+        private readonly IUsuarioAtualService _usuarioAtualService;
 
         // Guarda o serviço usado para consultar e alterar o fisioterapeuta.
-        public ProfissionalController(IProfissionalService profissionalService, ILogger<ProfissionalController> logger)
+        public ProfissionalController(
+            IProfissionalService profissionalService,
+            ILogger<ProfissionalController> logger,
+            IUsuarioAtualService usuarioAtualService)
         {
             _profissionalService = profissionalService;
             _logger = logger;
+            _usuarioAtualService = usuarioAtualService;
         }
 
         // Lista os fisioterapeutas cadastrados, com filtros opcionais de nome, especialidade e status ativo.
@@ -75,17 +80,11 @@ namespace AgendaiFisio.Controllers
 
             try
             {
-                var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-                if (string.IsNullOrEmpty(usuarioIdClaim))
-                {
-                    // Impede a atualização sem identificar o usuário.
+                var usuarioAtual = _usuarioAtualService.Obter();
+                if (usuarioAtual is null)
                     return Unauthorized("Usuário não identificado no token.");
-                }
 
-                var usuarioId = Guid.Parse(usuarioIdClaim);
-
-                await _profissionalService.AtualizarAsync(usuarioId, dto);
+                await _profissionalService.AtualizarAsync(usuarioAtual.UsuarioId, dto);
 
                 return Ok(new { mensagem = "Perfil atualizado com sucesso!" });
             }
@@ -121,16 +120,13 @@ namespace AgendaiFisio.Controllers
 
             try
             {
-                var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-                if (string.IsNullOrEmpty(usuarioIdClaim))
-                {
+                var usuarioAtual = _usuarioAtualService.Obter();
+                if (usuarioAtual is null)
                     return Unauthorized("Usuário não identificado no token.");
-                }
 
-                var usuarioId = Guid.Parse(usuarioIdClaim);
-
-                await _profissionalService.AtualizarEspecialidadeAsync(usuarioId, dto.EspecialidadeId!.Value);
+                await _profissionalService.AtualizarEspecialidadeAsync(
+                    usuarioAtual.UsuarioId,
+                    dto.EspecialidadeId!.Value);
 
                 return Ok(new { mensagem = "Especialidade atualizada com sucesso!" });
             }
