@@ -1,6 +1,8 @@
 using AgendaiFisio.Context;
 using AgendaiFisio.Entities;
 using Microsoft.EntityFrameworkCore;
+using  AgendaiFisio.DTOs.Agendamento;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace AgendaiFisio.Services.Agendamento;
 
@@ -25,7 +27,7 @@ public class AgendamentoService : IAgendamentoService
 
     // Lista a agenda, permitindo filtrar por dia, profissional e status.
     public async Task<IReadOnlyList<Entities.Agendamento>> ListAsync(
-        DateTime? data = null,
+        DateOnly? data = null,
         Guid? profissionalId = null,
         string? status = null)
     {
@@ -35,9 +37,7 @@ public class AgendamentoService : IAgendamentoService
 
         if (data.HasValue)
         {
-            var inicioDoDia = data.Value.Date;
-            var fimDoDia = inicioDoDia.AddDays(1);
-            query = query.Where(a => a.Data >= inicioDoDia && a.Data < fimDoDia);
+            query = query.Where(a => a.Data == data);
         }
 
         if (profissionalId.HasValue)
@@ -85,4 +85,38 @@ public class AgendamentoService : IAgendamentoService
 
         return agendamento;
     }
+
+    public async Task<ReagendamentoDTO> UpdateAsync(ReagendamentoDTO dto)
+    {
+        int linhasAfetadas = await _context.Agendamentos
+            .Where(a => a.Id == dto.Id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(a => a.Data, dto.Data)
+                .SetProperty(a => a.Hora, dto.Hora)
+            );
+
+        if (linhasAfetadas == 0)
+        {
+            throw new KeyNotFoundException($"Agendamento com ID {dto.Id} não encontrado.");
+        }
+        
+        return dto;
+    }
+
+    public async Task<string> DeleteAsync (CancelamentoDTO cancelamento)
+    {
+        int linhasAfetadas = await _context.Agendamentos
+            .Where(a => a.Id == cancelamento.Id && a.Status != "Cancelado" && a.Status != "Concluido")
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, cancelamento.Status));
+
+        if (linhasAfetadas == 0)
+        {
+            throw new KeyNotFoundException("Não foi possível cancelar o agendamento");
+        }
+        
+        return cancelamento.Status;
+    }
+    
 }
+        
+    

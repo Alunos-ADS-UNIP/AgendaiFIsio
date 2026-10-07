@@ -4,6 +4,7 @@ using AgendaiFisio.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AgendaiFisio.Migrations
 {
     [DbContext(typeof(AgendaiFisioDbContext))]
-    partial class AgendaiFisioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261006233022_reagendamentoo")]
+    partial class reagendamentoo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

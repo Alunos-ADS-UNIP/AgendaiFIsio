@@ -5,9 +5,9 @@ public interface IAgendamentoValidavel
 {
     Guid PacienteId { get; }
     Guid ProfissionalId { get; }
-    DateTime Data { get; }
-    DateTime Hora { get; }
-    string? Status { get; }
+    DateOnly Data { get; }
+    TimeOnly Hora { get; }
+    string? Observacoes { get; }
 }
 
 // Valida os dados que podem ser conferidos sem consultar o banco de dados.
@@ -26,7 +26,7 @@ public class AgendamentoAttribute : ValidationAttribute
     {
         ErrorMessage = "Os dados do agendamento são inválidos.";
     }
-
+    
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
         if (value is not IAgendamentoValidavel agendamento)
@@ -46,7 +46,7 @@ public class AgendamentoAttribute : ValidationAttribute
                 new[] { nameof(IAgendamentoValidavel.ProfissionalId) });
         }
 
-        if (agendamento.Data == default && agendamento.Data <= DateTime.UtcNow)
+        if (agendamento.Data == default && agendamento.Data <= DateOnly.FromDateTime(DateTime.UtcNow))
         {
             return new ValidationResult(
                 "A selecionada é inválida.",
@@ -59,15 +59,7 @@ public class AgendamentoAttribute : ValidationAttribute
                 "A horário desejado deve ser selecionado.",
                 new[] { nameof(IAgendamentoValidavel.Hora) });
         }
-
-        if (!string.IsNullOrWhiteSpace(agendamento.Status) &&
-            !StatusPermitidos.Contains(agendamento.Status.Trim()))
-        {
-            return new ValidationResult(
-                "O status deve ser Agendado, Confirmado, Cancelado ou Concluido.",
-                new[] { nameof(IAgendamentoValidavel.Status) });
-        }
-
+        
         return ValidationResult.Success;
     }
 }

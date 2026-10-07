@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AgendaiFisio.DTOs.Agendamento;
+using AgendaiFisio.Entities;
+using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Agendamento;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace AgendaiFisio.Controllers
 {
@@ -56,7 +59,6 @@ namespace AgendaiFisio.Controllers
                     ProfissionalId = dto.ProfissionalId,
                     Data = dto.Data,
                     Hora = dto.Hora,
-                    Status = dto.Status?.Trim() ?? string.Empty,
                     Observacoes = dto.Observacoes
                 };
 
@@ -76,6 +78,43 @@ namespace AgendaiFisio.Controllers
                 return Conflict(new { erro = ex.Message });
             }
         }
+
+        [HttpPut]
+        public async Task<ActionResult<ReagendamentoDTO>> UpdateAsync([FromBody] ReagendamentoDTO dtoReagendamento)
+        {
+            try
+            {
+                var reagendado = await _agendamentoService.UpdateAsync(dtoReagendamento);
+                return Ok(reagendado);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { erro = ex.Message });
+            }
+        }
+        
+        [HttpPut("cancelar")]
+        public async Task<ActionResult<CancelamentoDTO>> DeleteAsync([FromBody] CancelamentoDTO dtocancelamento)
+        {
+            try
+            {
+                var cancelado = await _agendamentoService.DeleteAsync(dtocancelamento);
+                return Ok(cancelado);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { erro = ex.Message });
+            }
+        }
+        
 
         private static AgendamentoResponseDTO ToResponse(Entities.Agendamento agendamento)
         {
