@@ -145,6 +145,67 @@ namespace AgendaiFisio.Controllers
             }
         }
 
+        // Move uma consulta visível para o usuário atual para outro horário disponível.
+        [HttpPut("{id:guid}/reagendar")]
+        public async Task<ActionResult<AgendamentoResponseDTO>> ReagendarAsync(
+            Guid id,
+            [FromBody] ReagendamentoDTO dto)
+        {
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                var reagendado = await _agendamentoService.ReagendarAsync(
+                    id,
+                    dto.DataHora,
+                    usuarioAtual.UsuarioId,
+                    usuarioAtual.TipoUsuario);
+
+                return Ok(ToResponse(reagendado));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { erro = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
+        }
+
+        // Cancela logicamente uma consulta visível e mantém o registro no histórico.
+        [HttpPatch("{id:guid}/cancelar")]
+        public async Task<ActionResult<AgendamentoResponseDTO>> CancelarAsync(Guid id)
+        {
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                var cancelado = await _agendamentoService.CancelarAsync(
+                    id,
+                    usuarioAtual.UsuarioId,
+                    usuarioAtual.TipoUsuario);
+
+                return Ok(ToResponse(cancelado));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { erro = ex.Message });
+            }
+        }
+
         private static AgendamentoResponseDTO ToResponse(Entities.Agendamento agendamento)
         {
             return new AgendamentoResponseDTO

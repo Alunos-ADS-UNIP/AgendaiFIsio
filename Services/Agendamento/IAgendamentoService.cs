@@ -18,4 +18,15 @@ public interface IAgendamentoService
         Guid pacienteId);
 
     Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento);
+
+    Task<Entities.Agendamento> ReagendarAsync(
+        Guid id,
+        DateTime novaDataHora,
+        Guid usuarioId,
+        string tipoUsuario);
+
+    Task<Entities.Agendamento> CancelarAsync(
+        Guid id,
+        Guid usuarioId,
+        string tipoUsuario);
 }

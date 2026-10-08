@@ -334,8 +334,83 @@ try
     Check(agendaFiltrada.EnumerateArray().Any(a => a.GetProperty("id").GetGuid() == agendamentoId), "Filtro retorna agendamento criado");
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horarioBrasilia }, HttpStatusCode.Conflict, "Agenda rejeita conflito mesmo com offset distinto", patientToken);
 
+    var rotaReagendamento = "/api/agendamento/" + agendamentoId + "/reagendar";
+    var rotaCancelamento = "/api/agendamento/" + agendamentoId + "/cancelar";
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(4) },
+        HttpStatusCode.Unauthorized, "Reagendamento exige autenticacao");
+    await Request(HttpMethod.Patch, rotaCancelamento, null,
+        HttpStatusCode.Unauthorized, "Cancelamento exige autenticacao");
+    await Request(HttpMethod.Put, rotaReagendamento,
+        new { dataHora = horario.AddHours(4).ToString("yyyy-MM-ddTHH:mm:ss") },
+        HttpStatusCode.BadRequest, "Reagendamento rejeita data sem offset", patientToken);
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = DateTime.UtcNow.AddMinutes(-5) },
+        HttpStatusCode.BadRequest, "Reagendamento rejeita horario passado", patientToken);
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(4) },
+        HttpStatusCode.NotFound, "Outro paciente nao reagenda consulta alheia", segundoPacienteToken);
+    await Request(HttpMethod.Patch, rotaCancelamento, null,
+        HttpStatusCode.NotFound, "Outro paciente nao cancela consulta alheia", segundoPacienteToken);
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(4) },
+        HttpStatusCode.NotFound, "Outro profissional nao reagenda consulta alheia", segundoProfissionalToken);
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(2) },
+        HttpStatusCode.Conflict, "Reagendamento rejeita horario ocupado", patientToken);
+    await Request(HttpMethod.Put,
+        "/api/agendamento/" + Guid.NewGuid() + "/reagendar",
+        new { dataHora = horario.AddHours(4) }, HttpStatusCode.NotFound,
+        "Reagendamento de consulta inexistente retorna 404", patientToken);
+    await Request(HttpMethod.Patch,
+        "/api/agendamento/" + Guid.NewGuid() + "/cancelar", null,
+        HttpStatusCode.NotFound, "Cancelamento de consulta inexistente retorna 404", patientToken);
+
+    var reagendadoPeloProfissional = await Request(
+        HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(3) },
+        HttpStatusCode.OK, "Profissional reagenda consulta atribuida a ele", professionalToken);
+    Check(reagendadoPeloProfissional.GetProperty("dataHora").GetDateTime() == horario.AddHours(3),
+        "Reagendamento do profissional persiste o horario solicitado");
+
+    var novoHorario = horario.AddHours(4);
+    var reagendado = await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = novoHorario },
+        HttpStatusCode.OK, "Paciente reagenda a propria consulta", patientToken);
+    Check(reagendado.GetProperty("dataHora").GetDateTime() == novoHorario &&
+        reagendado.GetProperty("status").GetString() == "Agendado",
+        "Reagendamento devolve data UTC e preserva status");
+    Check(await db.Agendamentos.AsNoTracking()
+            .Where(a => a.Id == agendamentoId)
+            .Select(a => a.DataHora)
+            .SingleAsync() == novoHorario,
+        "Reagendamento persiste o novo horario");
+
+    await Request(HttpMethod.Put,
+        "/api/agendamento/" + consultaAntiga.Id + "/reagendar",
+        new { dataHora = horario.AddHours(5) }, HttpStatusCode.Conflict,
+        "Consulta concluida nao pode ser reagendada", patientToken);
+    await Request(HttpMethod.Patch,
+        "/api/agendamento/" + consultaAntiga.Id + "/cancelar", null,
+        HttpStatusCode.Conflict, "Consulta concluida nao pode ser cancelada", patientToken);
+
+    var cancelado = await Request(HttpMethod.Patch, rotaCancelamento, null,
+        HttpStatusCode.OK, "Paciente cancela a propria consulta", patientToken);
+    Check(cancelado.GetProperty("status").GetString() == "Cancelado",
+        "Cancelamento devolve o status persistido");
+    Check(await db.Agendamentos.AsNoTracking()
+            .Where(a => a.Id == agendamentoId)
+            .Select(a => a.Status)
+            .SingleAsync() == "Cancelado",
+        "Cancelamento logico preserva o registro");
+    await Request(HttpMethod.Patch, rotaCancelamento, null,
+        HttpStatusCode.Conflict, "Consulta cancelada nao pode ser cancelada novamente", patientToken);
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(6) },
+        HttpStatusCode.Conflict, "Consulta cancelada nao pode ser reagendada", patientToken);
+
+    await Request(HttpMethod.Post, "/api/agendamento",
+        new { profissionalId = professional.Id, dataHora = novoHorario },
+        HttpStatusCode.Created, "Horario liberado pelo cancelamento pode ser reutilizado", patientToken);
+
     var horarioCancelado = horario.AddHours(1);
-    await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horarioCancelado, status = "Cancelado" }, HttpStatusCode.Created, "Registra horario cancelado", patientToken);
+    var canceladoNormalizado = await Request(HttpMethod.Post, "/api/agendamento",
+        new { profissionalId = professional.Id, dataHora = horarioCancelado, status = " cancelado " },
+        HttpStatusCode.Created, "Registra horario cancelado", patientToken);
+    Check(canceladoNormalizado.GetProperty("status").GetString() == "Cancelado",
+        "Status de agendamento e normalizado");
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horarioCancelado }, HttpStatusCode.Created, "Horario cancelado pode ser reagendado", patientToken);
     await Request(HttpMethod.Post, "/api/auth/logout", null, HttpStatusCode.NoContent,
         "Logout autenticado encerra a sessao do cliente", patientToken);
