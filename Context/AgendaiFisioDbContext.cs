@@ -21,6 +21,7 @@ namespace AgendaiFisio.Context
         public DbSet<AvaliacaoFisioterapeuta> AvaliacaoFisioterapeuta { get; set; }
         public DbSet<PlanoTerapeutico> PlanosTerapeutico { get; set; }
         public DbSet<Endereco> Enderecos { get; set; }
+        public DbSet<Especialidade> Especialidades { get; set; }
         public DbSet<Agendamento> Agendamentos { get; set; }
 
 
@@ -46,6 +47,32 @@ namespace AgendaiFisio.Context
                 .HasIndex(p => p.Crefito)
                 .IsUnique()
                 .HasFilter("[Crefito] <> ''");
+
+            // Impede duas especialidades com o mesmo nome. A collation Latin1_General_CI_AI faz
+            // a comparação (e o índice único) ignorar maiúsculas/minúsculas e acentos; o trim e o
+            // colapso de espaços internos ficam a cargo do EspecialidadeNomeNormalizador.
+            modelBuilder.Entity<Especialidade>(e =>
+            {
+                e.Property(x => x.Nome)
+                    .HasMaxLength(100)
+                    .IsRequired()
+                    .UseCollation("Latin1_General_CI_AI");
+                e.HasIndex(x => x.Nome).IsUnique();
+
+                // Carrega o catálogo inicial aprovado (ver docs/especialidades.md). Reexecutar a
+                // migration não duplica nem troca os IDs: o EF só grava a diferença entre esta
+                // lista e o que já existe no histórico de migrations.
+                e.HasData(EspecialidadeCatalogoSeed.Itens);
+            });
+
+            // Liga o profissional a uma especialidade do catálogo. O vínculo é opcional e nunca é
+            // apagado em cascata: para remover uma especialidade seria preciso desvincular todos
+            // os profissionais primeiro (não há endpoint de DELETE nesta entrega).
+            modelBuilder.Entity<Profissional>()
+                .HasOne(p => p.Especialidade)
+                .WithMany()
+                .HasForeignKey(p => p.EspecialidadeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Evita apagar avaliações junto com o profissional.
             modelBuilder.Entity<AvaliacaoFisioterapeuta>()
@@ -76,9 +103,13 @@ namespace AgendaiFisio.Context
 
             // Evita dois agendamentos para o mesmo profissional no mesmo horário.
             modelBuilder.Entity<Agendamento>()
-                .HasIndex(a => new { a.ProfissionalId, a.Hora })
+                .HasIndex(a => new { a.ProfissionalId, a.DataHora })
                 .IsUnique()
                 .HasFilter("[Status] <> 'Cancelado'");
+
+            // Sustenta a paginação do histórico de consultas de um paciente por data.
+            modelBuilder.Entity<Agendamento>()
+                .HasIndex(a => new { a.PacienteId, a.DataHora });
         }
         
     }

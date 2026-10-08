@@ -28,11 +28,8 @@ namespace AgendaiFisio.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateOnly>("Data")
-                        .HasColumnType("date");
-
-                    b.Property<TimeOnly>("Hora")
-                        .HasColumnType("time");
+                    b.Property<DateTime>("DataHora")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Observacoes")
                         .HasColumnType("nvarchar(max)");
@@ -49,9 +46,9 @@ namespace AgendaiFisio.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PacienteId");
+                    b.HasIndex("PacienteId", "DataHora");
 
-                    b.HasIndex("ProfissionalId", "Hora")
+                    b.HasIndex("ProfissionalId", "DataHora")
                         .IsUnique()
                         .HasFilter("[Status] <> 'Cancelado'");
 
@@ -139,6 +136,108 @@ namespace AgendaiFisio.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Enderecos");
+                });
+
+            modelBuilder.Entity("AgendaiFisio.Entities.Especialidade", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_CI_AI");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nome")
+                        .IsUnique();
+
+                    b.ToTable("Especialidades");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
+                            Nome = "Acupuntura"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000002"),
+                            Nome = "Aquática"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000003"),
+                            Nome = "Cardiovascular"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000004"),
+                            Nome = "Dermatofuncional"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000005"),
+                            Nome = "Fisioterapia do Trabalho"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000006"),
+                            Nome = "Esportiva"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000007"),
+                            Nome = "Gerontologia"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000008"),
+                            Nome = "Neurofuncional"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000009"),
+                            Nome = "Oncologia"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000010"),
+                            Nome = "Osteopatia"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000011"),
+                            Nome = "Quiropraxia"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000012"),
+                            Nome = "Reumatologia"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000013"),
+                            Nome = "Fisioterapia Respiratória"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000014"),
+                            Nome = "Fisioterapia em Saúde da Mulher"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000015"),
+                            Nome = "Traumato-Ortopédica"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0000-000000000016"),
+                            Nome = "Terapia Intensiva"
+                        });
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Paciente", b =>
@@ -241,9 +340,13 @@ namespace AgendaiFisio.Migrations
                     b.Property<DateTime>("DataNascimento")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Especialidade")
+                    b.Property<Guid?>("EspecialidadeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EspecialidadeTextoLegado")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("Especialidade");
 
                     b.Property<string>("NomeCompleto")
                         .IsRequired()
@@ -261,6 +364,8 @@ namespace AgendaiFisio.Migrations
                     b.HasIndex("Crefito")
                         .IsUnique()
                         .HasFilter("[Crefito] <> ''");
+
+                    b.HasIndex("EspecialidadeId");
 
                     b.HasIndex("UsuarioId")
                         .IsUnique();
@@ -364,11 +469,18 @@ namespace AgendaiFisio.Migrations
 
             modelBuilder.Entity("AgendaiFisio.Entities.Profissional", b =>
                 {
+                    b.HasOne("AgendaiFisio.Entities.Especialidade", "Especialidade")
+                        .WithMany()
+                        .HasForeignKey("EspecialidadeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("AgendaiFisio.Entities.Usuario", "Usuario")
                         .WithOne("Profissional")
                         .HasForeignKey("AgendaiFisio.Entities.Profissional", "UsuarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Especialidade");
 
                     b.Navigation("Usuario");
                 });

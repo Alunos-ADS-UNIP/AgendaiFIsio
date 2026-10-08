@@ -3,11 +3,14 @@ namespace AgendaiFisio.Validations;
 
 public interface IAgendamentoValidavel
 {
-    Guid PacienteId { get; }
     Guid ProfissionalId { get; }
-    DateOnly Data { get; }
-    TimeOnly Hora { get; }
-    string? Observacoes { get; }
+    DateTime DataHora { get; }
+    string? Status { get; }
+}
+
+public interface IAgendamentoComPaciente
+{
+    Guid PacienteId { get; }
 }
 
 // Valida os dados que podem ser conferidos sem consultar o banco de dados.
@@ -26,17 +29,18 @@ public class AgendamentoAttribute : ValidationAttribute
     {
         ErrorMessage = "Os dados do agendamento são inválidos.";
     }
-    
+
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
         if (value is not IAgendamentoValidavel agendamento)
             return new ValidationResult(ErrorMessage);
 
-        if (agendamento.PacienteId == Guid.Empty)
+        if (value is IAgendamentoComPaciente agendamentoComPaciente &&
+            agendamentoComPaciente.PacienteId == Guid.Empty)
         {
             return new ValidationResult(
                 "O paciente é obrigatório.",
-                new[] { nameof(IAgendamentoValidavel.PacienteId) });
+                new[] { nameof(IAgendamentoComPaciente.PacienteId) });
         }
 
         if (agendamento.ProfissionalId == Guid.Empty)
@@ -46,20 +50,28 @@ public class AgendamentoAttribute : ValidationAttribute
                 new[] { nameof(IAgendamentoValidavel.ProfissionalId) });
         }
 
-        if (agendamento.Data == default && agendamento.Data <= DateOnly.FromDateTime(DateTime.UtcNow))
+        if (agendamento.DataHora == default)
         {
             return new ValidationResult(
-                "A selecionada é inválida.",
-                new[] { nameof(IAgendamentoValidavel.Data) });
+                "A data e hora do agendamento são obrigatórias.",
+                new[] { nameof(IAgendamentoValidavel.DataHora) });
         }
 
-        if (agendamento.Hora ==default)
+        if (agendamento.DataHora <= DateTime.UtcNow)
         {
             return new ValidationResult(
-                "A horário desejado deve ser selecionado.",
-                new[] { nameof(IAgendamentoValidavel.Hora) });
+                "O agendamento deve ser marcado para uma data e hora futuras.",
+                new[] { nameof(IAgendamentoValidavel.DataHora) });
         }
-        
+
+        if (!string.IsNullOrWhiteSpace(agendamento.Status) &&
+            !StatusPermitidos.Contains(agendamento.Status.Trim()))
+        {
+            return new ValidationResult(
+                "O status deve ser Agendado, Confirmado, Cancelado ou Concluido.",
+                new[] { nameof(IAgendamentoValidavel.Status) });
+        }
+
         return ValidationResult.Success;
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using AgendaiFisio.DTOs;
+using AgendaiFisio.DTOs.Especialidade;
 using AgendaiFisio.DTOs.Profissional;
 
 using AgendaiFisio.Context;
@@ -29,10 +30,10 @@ namespace AgendaiFisio.Services.Profissional
                 query = query.Where(p => p.NomeCompleto.ToLower().Contains(nome));
             }
 
-            if (!string.IsNullOrWhiteSpace(filtro.Especialidade))
+            if (filtro.EspecialidadeId.HasValue)
             {
-                var especialidade = filtro.Especialidade.Trim().ToLower();
-                query = query.Where(p => p.Especialidade.ToLower().Contains(especialidade));
+                // Sem este filtro, profissionais sem especialidade escolhida continuam aparecendo.
+                query = query.Where(p => p.EspecialidadeId == filtro.EspecialidadeId.Value);
             }
 
             if (filtro.Ativo.HasValue)
@@ -50,7 +51,9 @@ namespace AgendaiFisio.Services.Profissional
                 {
                     Id = p.Id,
                     NomeCompleto = p.NomeCompleto,
-                    Especialidade = p.Especialidade,
+                    Especialidade = p.Especialidade == null
+                        ? null
+                        : new EspecialidadeResponseDTO { Id = p.Especialidade.Id, Nome = p.Especialidade.Nome },
                     Crefito = p.Crefito,
                     Ativo = p.Ativo
                 })
@@ -70,6 +73,7 @@ namespace AgendaiFisio.Services.Profissional
             var profissional = await _context.Profissionais
                 .AsNoTracking()
                 .Include(p => p.Usuario)
+                .Include(p => p.Especialidade)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (profissional is null)
@@ -83,7 +87,9 @@ namespace AgendaiFisio.Services.Profissional
                 NomeCompleto = profissional.NomeCompleto,
                 Crefito = profissional.Crefito,
                 Telefone = profissional.Telefone,
-                Especialidade = profissional.Especialidade,
+                Especialidade = profissional.Especialidade is null
+                    ? null
+                    : new EspecialidadeResponseDTO { Id = profissional.Especialidade.Id, Nome = profissional.Especialidade.Nome },
                 Bio = profissional.Bio,
                 DataCadastro = profissional.DataCadastro,
                 Ativo = profissional.Ativo,
@@ -112,14 +118,43 @@ namespace AgendaiFisio.Services.Profissional
                 throw new InvalidOperationException("Já existe outro fisioterapeuta cadastrado com este CREFITO.");
             }
 
+            // A especialidade não é alterada aqui — ver AtualizarEspecialidadeAsync. Omitir o
+            // campo neste PUT nunca mexe no vínculo já salvo.
             profissional.NomeCompleto = dto.NomeCompleto.Trim();
             profissional.Cpf = dto.Cpf.Trim();
             profissional.Crefito = crefito;
             profissional.Telefone = dto.Telefone.Trim();
             profissional.DataNascimento = dto.DataNascimento;
-            profissional.Especialidade = dto.Especialidade.Trim();
             profissional.Bio = dto.Bio?.Trim() ?? string.Empty;
             profissional.Ativo = dto.Ativo;
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task AtualizarEspecialidadeAsync(Guid usuarioId, Guid especialidadeId)
+        {
+            var profissional = await _context.Profissionais
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
+
+            if (profissional is null)
+            {
+                throw new KeyNotFoundException("Fisioterapeuta não encontrado para o usuário informado.");
+            }
+
+            if (especialidadeId == Guid.Empty)
+            {
+                throw new ArgumentException("Especialidade inválida.");
+            }
+
+            var especialidadeExiste = await _context.Especialidades.AnyAsync(e => e.Id == especialidadeId);
+
+            if (!especialidadeExiste)
+            {
+                throw new ArgumentException("Especialidade informada não existe no catálogo.");
+            }
+
+            // Reenviar o mesmo id mantém um único vínculo; outro id substitui a FK atomicamente.
+            profissional.EspecialidadeId = especialidadeId;
 
             await _context.SaveChangesAsync();
         }

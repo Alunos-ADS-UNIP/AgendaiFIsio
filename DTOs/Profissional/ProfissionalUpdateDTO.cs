@@ -26,9 +26,9 @@ namespace AgendaiFisio.DTOs.Profissional
         [Required(ErrorMessage = "A data de nascimento é obrigatória.")]
         public DateTime DataNascimento { get; set; }
 
-        [Required(ErrorMessage = "A especialidade é obrigatória.")]
-        [StringLength(100, MinimumLength = 3, ErrorMessage = "A especialidade deve ter entre 3 e 100 caracteres.")]
-        public string Especialidade { get; set; } = string.Empty;
+        // A especialidade não faz parte deste contrato: ela é escolhida/trocada só pelo
+        // PUT api/profissional/especialidade (ver ProfissionalEspecialidadeUpdateDTO). Omitir
+        // este campo aqui nunca apaga nem altera o vínculo já salvo.
 
         [StringLength(1000, ErrorMessage = "A bio pode ter no máximo 1000 caracteres.")]
         public string Bio { get; set; } = string.Empty;

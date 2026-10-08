@@ -1,19 +1,32 @@
-using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Entities;
 
 namespace AgendaiFisio.Services.Agendamento;
 
 public interface IAgendamentoService
 {
-    Task<Entities.Agendamento?> GetByIdAsync(Guid id);
+    Task<Entities.Agendamento?> GetByIdAsync(Guid id, Guid usuarioId, string tipoUsuario);
 
     Task<IReadOnlyList<Entities.Agendamento>> ListAsync(
-        DateOnly? data = null,
+        Guid usuarioId,
+        string tipoUsuario,
+        DateTime? data = null,
         Guid? profissionalId = null,
         string? status = null);
 
-    Task<Entities.Agendamento> CreateAsync(Entities.Agendamento agendamento);
-    Task<ReagendamentoDTO> UpdateAsync(ReagendamentoDTO agendamento);
-    Task<string> DeleteAsync(CancelamentoDTO cancelamento);
-    
+    Task<Entities.Agendamento> CreateForPatientAsync(
+        Entities.Agendamento agendamento,
+        Guid pacienteId);
+
+    Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento);
+
+    Task<Entities.Agendamento> ReagendarAsync(
+        Guid id,
+        DateTime novaDataHora,
+        Guid usuarioId,
+        string tipoUsuario);
+
+    Task<Entities.Agendamento> CancelarAsync(
+        Guid id,
+        Guid usuarioId,
+        string tipoUsuario);
 }

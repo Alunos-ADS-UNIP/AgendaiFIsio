@@ -11,8 +11,7 @@ public class AgendamentoResponseDTO
     public Guid ProfissionalId { get; set; }
     public string ProfissionalNome { get; set; } = string.Empty;
 
-    public DateOnly Data { get; set; }
-    public TimeOnly Hora { get; set; }
+    public DateTime DataHora { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Observacoes { get; set; }
 }
