@@ -12,6 +12,10 @@ namespace AgendaiFisio.Services.Paciente
     {
         // Busca um paciente pelo seu identificador.
         Task<Entities.Paciente?> GetPacienteByIdAsync(Guid id);
+        // Lista pacientes com pesquisa e paginação para uso profissional.
+        Task<PagedResultDTO<PacienteListItemDTO>> ListarAsync(PacienteFiltroDTO filtro);
+        // Retorna o cadastro completo de um paciente específico.
+        Task<PacienteMeResponseDTO> ObterPorIdAsync(Guid pacienteId);
         // Retorna o perfil do próprio paciente autenticado.
         Task<PacienteMeResponseDTO?> ObterMeuPerfilAsync(Guid pacienteId);
         // Atualiza os dados do paciente.

@@ -32,10 +32,86 @@ namespace AgendaiFisio.Services.Paciente
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
+        public async Task<PagedResultDTO<PacienteListItemDTO>> ListarAsync(PacienteFiltroDTO filtro)
+        {
+            var query = _context.Pacientes.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(filtro.Busca))
+            {
+                var busca = filtro.Busca.Trim().ToLower();
+                var documento = SomenteDigitos(filtro.Busca);
+
+                query = documento.Length == 0
+                    ? query.Where(p => p.NomeCompleto.ToLower().Contains(busca))
+                    : query.Where(p => p.NomeCompleto.ToLower().Contains(busca) ||
+                        p.Cpf.Replace(".", "").Replace("-", "").Replace(" ", "").Contains(documento));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtro.Nome))
+            {
+                var nome = filtro.Nome.Trim().ToLower();
+                query = query.Where(p => p.NomeCompleto.ToLower().Contains(nome));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtro.Documento))
+            {
+                var documento = SomenteDigitos(filtro.Documento);
+                query = documento.Length == 0
+                    ? query.Where(_ => false)
+                    : query.Where(p => p.Cpf.Replace(".", "").Replace("-", "").Replace(" ", "").Contains(documento));
+            }
+
+            var totalRegistros = await query.CountAsync();
+            var deslocamento = ((long)filtro.Pagina - 1) * filtro.TamanhoPagina;
+
+            var registros = deslocamento >= totalRegistros
+                ? []
+                : await query
+                    .OrderBy(p => p.NomeCompleto)
+                    .ThenBy(p => p.Id)
+                    .Skip((int)deslocamento)
+                    .Take(filtro.TamanhoPagina)
+                    .Select(p => new
+                    {
+                        p.Id,
+                        p.NomeCompleto,
+                        p.Cpf,
+                        p.Telefone,
+                        Email = p.Usuario.Email
+                    })
+                    .ToListAsync();
+
+            return new PagedResultDTO<PacienteListItemDTO>
+            {
+                Itens = registros.Select(p => new PacienteListItemDTO
+                {
+                    Id = p.Id,
+                    NomeCompleto = p.NomeCompleto,
+                    CpfMascarado = MascararCpf(p.Cpf),
+                    Telefone = p.Telefone,
+                    Email = p.Email
+                }).ToList(),
+                TotalRegistros = totalRegistros,
+                PaginaAtual = filtro.Pagina,
+                TamanhoPagina = filtro.TamanhoPagina
+            };
+        }
+
+        public async Task<PacienteMeResponseDTO> ObterPorIdAsync(Guid pacienteId)
+        {
+            var paciente = await ProjetarPerfilCompleto(pacienteId).FirstOrDefaultAsync();
+            return paciente ?? throw new KeyNotFoundException("Paciente não encontrado.");
+        }
+
         // Projeta apenas o perfil associado ao identificador assinado no JWT.
         public async Task<PacienteMeResponseDTO?> ObterMeuPerfilAsync(Guid pacienteId)
         {
-            return await _context.Pacientes.AsNoTracking()
+            return await ProjetarPerfilCompleto(pacienteId).FirstOrDefaultAsync();
+        }
+
+        private IQueryable<PacienteMeResponseDTO> ProjetarPerfilCompleto(Guid pacienteId)
+        {
+            return _context.Pacientes.AsNoTracking()
                 .Where(p => p.Id == pacienteId)
                 .Select(p => new PacienteMeResponseDTO
                 {
@@ -58,8 +134,16 @@ namespace AgendaiFisio.Services.Paciente
                         Cidade = p.Endereco.Cidade,
                         Estado = p.Endereco.Estado
                     }
-                })
-                .FirstOrDefaultAsync();
+                });
+        }
+
+        private static string SomenteDigitos(string valor) =>
+            new(valor.Where(char.IsDigit).ToArray());
+
+        private static string MascararCpf(string cpf)
+        {
+            var digitos = SomenteDigitos(cpf);
+            return digitos.Length == 11 ? $"***.***.***-{digitos[^2..]}" : string.Empty;
         }
 
         // Atualiza os dados pessoais e o endereço do paciente.

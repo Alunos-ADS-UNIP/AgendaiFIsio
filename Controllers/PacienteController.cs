@@ -28,6 +28,31 @@ namespace AgendaiFisio.Controllers
             _usuarioAtualService = usuarioAtualService;
         }
 
+        // Lista pacientes com busca por nome ou CPF e paginação.
+        // Ex.: GET api/paciente?busca=ana&pagina=1&tamanhoPagina=10
+        [HttpGet]
+        [Authorize(Roles = PerfilDeUsuario.Profissional)]
+        public async Task<ActionResult<PagedResultDTO<PacienteListItemDTO>>> ListarAsync(
+            [FromQuery] PacienteFiltroDTO filtro)
+        {
+            return Ok(await _pacienteService.ListarAsync(filtro));
+        }
+
+        // Retorna o cadastro completo de um paciente para um profissional autenticado.
+        [HttpGet("{pacienteId:guid}")]
+        [Authorize(Roles = PerfilDeUsuario.Profissional)]
+        public async Task<ActionResult<PacienteMeResponseDTO>> ObterPorIdAsync(Guid pacienteId)
+        {
+            try
+            {
+                return Ok(await _pacienteService.ObterPorIdAsync(pacienteId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+        }
+
         // Retorna o perfil ligado ao paciente autenticado.
         [HttpGet("me")]
         [Authorize(Roles = PerfilDeUsuario.Paciente)]

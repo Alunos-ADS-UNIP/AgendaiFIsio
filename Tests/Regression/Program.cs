@@ -70,9 +70,9 @@ string CreateExpiredToken()
     return new JwtSecurityTokenHandler().WriteToken(
         new JwtSecurityTokenHandler().CreateToken(descriptor));
 }
-object Patient(string cpf, bool address) => address
-    ? new { nomeCompleto = prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "10", cep = "01001000", complemento = "Sala 1", bairro = "Centro", cidade = "Sao Paulo", estado = "SP" }
-    : new { nomeCompleto = prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "11", cep = "01001000" };
+object Patient(string cpf, bool address, string? nome = null) => address
+    ? new { nomeCompleto = nome ?? prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "10", cep = "01001000", complemento = "Sala 1", bairro = "Centro", cidade = "Sao Paulo", estado = "SP" }
+    : new { nomeCompleto = nome ?? prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "11", cep = "01001000" };
 object Professional(string cpf, string? nome = null) => new { nomeCompleto = nome ?? prefix, cpf, crefito = "T" + Guid.NewGuid().ToString("N")[..12], telefone = "11999999999", dataNascimento = "1990-01-01", bio = "Teste automatizado", ativo = true };
 Check(await db.Database.CanConnectAsync(), "Banco conectado");
 Check(!(await db.Database.GetPendingMigrationsAsync()).Any(), "Banco sem migracoes pendentes");
@@ -167,8 +167,11 @@ try
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("52998224725", true), HttpStatusCode.Forbidden, "Profissional nao altera paciente", professionalToken);
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("52998224725", true), HttpStatusCode.OK, "Paciente preenche endereco", patientToken);
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("52998224725", false), HttpStatusCode.OK, "Paciente atualiza omitindo campos opcionais", patientToken);
+    await Request(HttpMethod.Put, "/api/paciente/completar-perfil",
+        Patient("11144477735", true, prefix + " Segundo Paciente"), HttpStatusCode.OK,
+        "Segundo paciente preenche o perfil", segundoPacienteToken);
     var patient = await db.Pacientes.AsNoTracking().Include(p => p.Endereco).SingleAsync(p => p.Usuario.Email == emails[0]);
-    var segundoPaciente = await db.Pacientes.AsNoTracking().SingleAsync(p => p.Usuario.Email == emails[2]);
+    var segundoPaciente = await db.Pacientes.AsNoTracking().Include(p => p.Endereco).SingleAsync(p => p.Usuario.Email == emails[2]);
     Check(pacienteMeAuth.GetProperty("perfilId").GetGuid() == patient.Id,
         "Auth me devolve o perfil correto");
     var pacienteMe = await Request(HttpMethod.Get, "/api/paciente/me", null, HttpStatusCode.OK,
@@ -180,6 +183,67 @@ try
     await Request(HttpMethod.Get, "/api/paciente/me", null, HttpStatusCode.Forbidden,
         "Profissional nao usa perfil me de paciente", professionalToken);
     Check(patient.Endereco.Complemento == "Sala 1" && patient.Endereco.Bairro == "Centro" && patient.Endereco.Cidade == "Sao Paulo" && patient.Endereco.Estado == "SP" && patient.Endereco.Numero == "11", "Endereco preservado no banco");
+
+    await Request(HttpMethod.Get, "/api/paciente", null, HttpStatusCode.Unauthorized,
+        "Listagem de pacientes exige login");
+    await Request(HttpMethod.Get, "/api/paciente", null, HttpStatusCode.Forbidden,
+        "Paciente nao lista pacientes", patientToken);
+    await Request(HttpMethod.Get, "/api/paciente", null, HttpStatusCode.Forbidden,
+        "Clinica nao lista pacientes", adminToken);
+    var buscaPacientes = await Request(HttpMethod.Get,
+        "/api/paciente?busca=" + Uri.EscapeDataString(prefix) + "&pagina=1&tamanhoPagina=1",
+        null, HttpStatusCode.OK, "Profissional pesquisa pacientes com paginacao", professionalToken);
+    Check(buscaPacientes.GetProperty("itens").GetArrayLength() == 1 &&
+        buscaPacientes.GetProperty("totalRegistros").GetInt32() == 2 &&
+        buscaPacientes.GetProperty("paginaAtual").GetInt32() == 1 &&
+        buscaPacientes.GetProperty("tamanhoPagina").GetInt32() == 1 &&
+        buscaPacientes.GetProperty("totalPaginas").GetInt32() == 2,
+        "Listagem de pacientes informa totais e paginas");
+    var primeiroPacienteListado = buscaPacientes.GetProperty("itens")[0];
+    Check(primeiroPacienteListado.GetProperty("id").GetGuid() == patient.Id &&
+        primeiroPacienteListado.GetProperty("cpfMascarado").GetString() == "***.***.***-25" &&
+        !primeiroPacienteListado.TryGetProperty("cpf", out _) &&
+        !primeiroPacienteListado.TryGetProperty("dataNascimento", out _) &&
+        !primeiroPacienteListado.TryGetProperty("endereco", out _),
+        "Listagem identifica o paciente sem expor o cadastro completo");
+    var segundaPaginaPacientes = await Request(HttpMethod.Get,
+        "/api/paciente?nome=" + Uri.EscapeDataString(prefix) + "&pagina=2&tamanhoPagina=1",
+        null, HttpStatusCode.OK, "Profissional percorre a segunda pagina de pacientes", professionalToken);
+    Check(segundaPaginaPacientes.GetProperty("itens")[0].GetProperty("id").GetGuid() == segundoPaciente.Id,
+        "Paginacao de pacientes possui ordem estavel");
+    var buscaPorDocumento = await Request(HttpMethod.Get,
+        "/api/paciente?documento=" + Uri.EscapeDataString("111.444.777-35"),
+        null, HttpStatusCode.OK, "Profissional pesquisa paciente por CPF formatado", professionalToken);
+    Check(buscaPorDocumento.GetProperty("totalRegistros").GetInt32() == 1 &&
+        buscaPorDocumento.GetProperty("itens")[0].GetProperty("id").GetGuid() == segundoPaciente.Id,
+        "Busca por documento ignora pontuacao");
+    var buscaPorNome = await Request(HttpMethod.Get,
+        "/api/paciente?nome=" + Uri.EscapeDataString("Segundo Paciente") + "&tamanhoPagina=500",
+        null, HttpStatusCode.OK, "Profissional pesquisa paciente por parte do nome", professionalToken);
+    Check(buscaPorNome.GetProperty("totalRegistros").GetInt32() == 1 &&
+        buscaPorNome.GetProperty("tamanhoPagina").GetInt32() == 50,
+        "Busca por nome limita a pagina a 50 registros");
+
+    await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null, HttpStatusCode.Unauthorized,
+        "Detalhe do paciente exige login");
+    await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null, HttpStatusCode.Forbidden,
+        "Paciente nao consulta cadastro de paciente por id", patientToken);
+    await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null, HttpStatusCode.Forbidden,
+        "Clinica nao consulta cadastro completo do paciente", adminToken);
+    var detalhePaciente = await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null,
+        HttpStatusCode.OK, "Profissional consulta cadastro completo do paciente", professionalToken);
+    Check(detalhePaciente.GetProperty("id").GetGuid() == patient.Id &&
+        detalhePaciente.GetProperty("usuarioId").GetGuid() == patient.UsuarioId &&
+        detalhePaciente.GetProperty("email").GetString() == emails[0] &&
+        detalhePaciente.GetProperty("nomeCompleto").GetString() == prefix &&
+        detalhePaciente.GetProperty("cpf").GetString() == "52998224725" &&
+        detalhePaciente.GetProperty("endereco").GetProperty("rua").GetString() == "Rua de teste" &&
+        detalhePaciente.GetProperty("endereco").GetProperty("numero").GetString() == "11" &&
+        detalhePaciente.GetProperty("endereco").GetProperty("complemento").GetString() == "Sala 1",
+        "Detalhe devolve todos os dados cadastrais do paciente");
+    await Request(HttpMethod.Get, "/api/paciente/" + Guid.NewGuid(), null, HttpStatusCode.NotFound,
+        "Detalhe de paciente inexistente retorna 404", professionalToken);
+
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725"), HttpStatusCode.OK, "Profissional atualiza perfil", professionalToken);
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725", prefix + " Segundo"), HttpStatusCode.OK, "Segundo profissional atualiza perfil", segundoProfissionalToken);
     await Request(HttpMethod.Put, "/api/profissional/especialidade", new { especialidadeId = (Guid?)null }, HttpStatusCode.BadRequest, "Especialidade nula rejeitada", professionalToken);

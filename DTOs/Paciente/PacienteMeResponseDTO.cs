@@ -1,6 +1,6 @@
 namespace AgendaiFisio.DTOs.Paciente;
 
-// Perfil completo devolvido somente ao próprio paciente autenticado.
+// Perfil completo devolvido ao próprio paciente ou por uma rota exclusiva para profissionais.
 public sealed class PacienteMeResponseDTO
 {
     public Guid Id { get; init; }
