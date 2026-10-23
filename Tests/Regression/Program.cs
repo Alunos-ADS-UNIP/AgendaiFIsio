@@ -24,7 +24,9 @@ var adminEmail = config["RegressionAdmin:Email"]
 var adminSenha = config["RegressionAdmin:Senha"]
     ?? throw new InvalidOperationException("Configure RegressionAdmin__Senha para executar os testes administrativos.");
 await using var db = new AgendaiFisioDbContext(new DbContextOptionsBuilder<AgendaiFisioDbContext>()
-    .UseSqlServer(config.GetConnectionString("AgendaiFisioDbContext")).Options);
+    .UseNpgsql(AgendaiFisio.Infrastructure.PostgresConnectionString.Resolve(
+        config,
+        "DATABASE_URL_UNPOOLED")).Options);
 using var http = new HttpClient { BaseAddress = new Uri(args.FirstOrDefault() ?? "http://localhost:5187") };
 var prefix = "regression-" + Guid.NewGuid().ToString("N");
 var emails = new[] { prefix + "-pac@example.invalid", prefix + "-prof@example.invalid", prefix + "-pac2@example.invalid", prefix + "-prof2@example.invalid" };

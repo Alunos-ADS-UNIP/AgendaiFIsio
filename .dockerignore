@@ -1,0 +1,9 @@
+.git
+.github
+.neon
+.env*
+bin
+obj
+Tests
+output
+appsettings.*.local.json

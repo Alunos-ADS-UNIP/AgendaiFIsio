@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: agendaifisio-api
+    runtime: docker
+    plan: free
+    region: ohio
+    branch: main
+    autoDeployTrigger: commit
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
+      - key: JwtSettings__SecretKey
+        generateValue: true
+      - key: JwtSettings__Issuer
+        value: AgendaiFisioAPI
+      - key: JwtSettings__Audience
+        value: AgendaiFisioClients
+      - key: JwtSettings__ExpirationHours
+        value: "8"

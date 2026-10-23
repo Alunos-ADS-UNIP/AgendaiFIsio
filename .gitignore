@@ -13,3 +13,5 @@ obj/
 # Segredos locais (nunca commitar credenciais reais).
 appsettings.*.local.json
 *.env
+.env.neon
+.neon

@@ -2,7 +2,7 @@ using AgendaiFisio.Context;
 using AgendaiFisio.Entities;
 using Microsoft.EntityFrameworkCore;
 using AgendaiFisio.Constants;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace AgendaiFisio.Services.Agendamento;
 
@@ -39,7 +39,9 @@ public class AgendamentoService : IAgendamentoService
 
         if (data.HasValue)
         {
-            var inicioDoDia = data.Value.Date;
+            // O filtro representa um dia civil em UTC. Query strings somente com a data chegam
+            // como DateTime Unspecified, que o PostgreSQL corretamente recusa em timestamptz.
+            var inicioDoDia = DateTime.SpecifyKind(data.Value.Date, DateTimeKind.Utc);
             var fimDoDia = inicioDoDia.AddDays(1);
             query = query.Where(a => a.DataHora >= inicioDoDia && a.DataHora < fimDoDia);
         }
@@ -192,7 +194,7 @@ public class AgendamentoService : IAgendamentoService
             await _context.SaveChangesAsync();
         }
         catch (DbUpdateException ex) when (
-            ex.InnerException is SqlException { Number: 2601 or 2627 })
+            ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             throw new InvalidOperationException(
                 "O profissional já possui um agendamento nesse horário.", ex);

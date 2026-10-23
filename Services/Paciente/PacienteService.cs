@@ -236,7 +236,7 @@ namespace AgendaiFisio.Services.Paciente
                     })
                     .ToListAsync();
 
-            // SQL Server datetime2 não conserva DateTime.Kind; os horários persistidos são UTC.
+            // Mantém o contrato da API explícito: horários históricos são devolvidos em UTC.
             foreach (var item in itens)
                 item.DataHora = DateTime.SpecifyKind(item.DataHora, DateTimeKind.Utc);
 

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Especialidade;
@@ -12,10 +12,6 @@ namespace AgendaiFisio.Services.Especialidade
     public class EspecialidadeService : IEspecialidadeService
     {
         private const string MensagemDuplicada = "Já existe uma especialidade cadastrada com este nome.";
-
-        // Números de erro do SQL Server para violação de índice/restrição única.
-        private const int SqlErrorIndiceUnicoDuplicado = 2601;
-        private const int SqlErrorChaveUnicaDuplicada = 2627;
 
         private readonly AgendaiFisioDbContext _context;
 
@@ -52,7 +48,7 @@ namespace AgendaiFisio.Services.Especialidade
                 throw new ArgumentException("O nome deve ter entre 3 e 100 caracteres.");
             }
 
-            // A collation da coluna Nome (Latin1_General_CI_AI) já ignora maiúsculas e acentos aqui.
+            // A collation ICU da coluna Nome já ignora maiúsculas e acentos aqui.
             var jaExiste = await _context.Especialidades.AnyAsync(e => e.Nome == nome);
 
             if (jaExiste)
@@ -79,13 +75,14 @@ namespace AgendaiFisio.Services.Especialidade
             return new EspecialidadeResponseDTO { Id = especialidade.Id, Nome = especialidade.Nome };
         }
 
-        // Só os erros 2601/2627 (violação de índice ou restrição única) significam nome
-        // duplicado; qualquer outra falha de banco deve seguir como erro interno de verdade,
-        // não como "nome já existe".
+        // Só a violação de unicidade do PostgreSQL significa nome duplicado; qualquer outra
+        // falha de banco deve seguir como erro interno de verdade.
         private static bool EhViolacaoDeChaveUnica(DbUpdateException ex)
         {
-            return ex.InnerException is SqlException sqlEx
-                && (sqlEx.Number == SqlErrorIndiceUnicoDuplicado || sqlEx.Number == SqlErrorChaveUnicaDuplicada);
+            return ex.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation
+            };
         }
     }
 }

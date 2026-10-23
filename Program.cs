@@ -12,12 +12,27 @@ using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Services.Profissional;
 using AgendaiFisio.Services.Agendamento;
 using AgendaiFisio.OpenApi;
+using AgendaiFisio.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configura o acesso ao banco de dados.
+// O Render fornece a porta em tempo de execução. Localmente, o launchSettings continua valendo.
+if (int.TryParse(Environment.GetEnvironmentVariable("PORT"), out var port))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+
+var connectionString = PostgresConnectionString.Resolve(
+    builder.Configuration,
+    "DATABASE_URL");
+var migrationConnectionString = PostgresConnectionString.Resolve(
+    builder.Configuration,
+    "DATABASE_URL_UNPOOLED",
+    connectionString);
+
+// Usa a URL pooled no tráfego normal da API. As migrations usam a URL direta da Neon.
 builder.Services.AddDbContext<AgendaiFisioDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("AgendaiFisioDbContext")));
+    options.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure()));
 
 // Registra os serviços usados pela aplicação.
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -87,6 +102,12 @@ app.UseAuthorization();
 
 // Liga as rotas aos métodos dos controladores.
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+    .AllowAnonymous();
+
+// Mantém o schema sincronizado em cada deploy/cold start. Quando não há migrations pendentes,
+// o EF apenas consulta o histórico e segue sem alterações.
+await ApplyDatabaseMigrationsAsync(migrationConnectionString);
 
 // Provisiona a primeira conta Clínica (admin) a partir da configuração, nunca pelo cadastro
 // público — é o "mecanismo confiável" exigido pela revisão (achado 2). Sem AdminSeed:Email e
@@ -96,6 +117,16 @@ app.MapControllers();
 await SeedContaClinicaInicialAsync(app);
 
 app.Run();
+
+static async Task ApplyDatabaseMigrationsAsync(string connectionString)
+{
+    var options = new DbContextOptionsBuilder<AgendaiFisioDbContext>()
+        .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure())
+        .Options;
+
+    await using var db = new AgendaiFisioDbContext(options);
+    await db.Database.MigrateAsync();
+}
 
 static async Task SeedContaClinicaInicialAsync(WebApplication app)
 {

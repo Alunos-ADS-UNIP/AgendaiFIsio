@@ -31,6 +31,14 @@ namespace AgendaiFisio.Context
             // Define as relações e regras das tabelas.
             base.OnModelCreating(modelBuilder);
 
+            // Equivale à antiga Latin1_General_CI_AI do SQL Server: comparações sem distinguir
+            // maiúsculas/minúsculas ou acentos no catálogo de especialidades.
+            modelBuilder.HasCollation(
+                "case_accent_insensitive",
+                locale: "und-u-ks-primary",
+                provider: "icu",
+                deterministic: false);
+
             // Liga uma avaliação a um único plano terapêutico.
             modelBuilder.Entity<AvaliacaoFisioterapeuta>()
                 .HasOne(a => a.Plano)
@@ -42,13 +50,21 @@ namespace AgendaiFisio.Context
                 .HasIndex(u => u.Email)
                 .IsUnique();
 
+            // Datas de nascimento não representam um instante nem um fuso horário.
+            modelBuilder.Entity<Paciente>()
+                .Property(p => p.DataNascimento)
+                .HasColumnType("date");
+            modelBuilder.Entity<Profissional>()
+                .Property(p => p.DataNascimento)
+                .HasColumnType("date");
+
             // Impede dois fisioterapeutas com o mesmo CREFITO, ignorando os cadastros ainda em branco.
             modelBuilder.Entity<Profissional>()
                 .HasIndex(p => p.Crefito)
                 .IsUnique()
-                .HasFilter("[Crefito] <> ''");
+                .HasFilter("\"Crefito\" <> ''");
 
-            // Impede duas especialidades com o mesmo nome. A collation Latin1_General_CI_AI faz
+            // Impede duas especialidades com o mesmo nome. A collation ICU faz
             // a comparação (e o índice único) ignorar maiúsculas/minúsculas e acentos; o trim e o
             // colapso de espaços internos ficam a cargo do EspecialidadeNomeNormalizador.
             modelBuilder.Entity<Especialidade>(e =>
@@ -56,7 +72,7 @@ namespace AgendaiFisio.Context
                 e.Property(x => x.Nome)
                     .HasMaxLength(100)
                     .IsRequired()
-                    .UseCollation("Latin1_General_CI_AI");
+                    .UseCollation("case_accent_insensitive");
                 e.HasIndex(x => x.Nome).IsUnique();
 
                 // Carrega o catálogo inicial aprovado (ver docs/especialidades.md). Reexecutar a
@@ -105,7 +121,7 @@ namespace AgendaiFisio.Context
             modelBuilder.Entity<Agendamento>()
                 .HasIndex(a => new { a.ProfissionalId, a.DataHora })
                 .IsUnique()
-                .HasFilter("[Status] <> 'Cancelado'");
+                .HasFilter("\"Status\" <> 'Cancelado'");
 
             // Sustenta a paginação do histórico de consultas de um paciente por data.
             modelBuilder.Entity<Agendamento>()
