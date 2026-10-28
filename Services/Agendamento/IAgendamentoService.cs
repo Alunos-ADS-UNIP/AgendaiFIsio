@@ -19,6 +19,11 @@ public interface IAgendamentoService
 
     Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento);
 
+    Task<Entities.Agendamento> CreateBlockAsync(
+        Guid profissionalId,
+        DateTime dataHora,
+        string? observacoes);
+
     Task<Entities.Agendamento> ReagendarAsync(
         Guid id,
         DateTime novaDataHora,

@@ -7,4 +7,7 @@ public static class StatusAgendamento
     public const string Confirmado = "Confirmado";
     public const string Cancelado = "Cancelado";
     public const string Concluido = "Concluido";
+
+    // Horário fora da grade do profissional, ocupado por um agendamento técnico.
+    public const string Bloqueado = "Bloqueado";
 }

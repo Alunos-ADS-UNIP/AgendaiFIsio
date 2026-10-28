@@ -62,28 +62,46 @@ namespace AgendaiFisio.Controllers
             return Ok(ToResponse(agendamento));
         }
 
-        // Reserva um horário para o próprio paciente autenticado.
+        // Reserva um horário para o próprio paciente autenticado. Quando quem chama é o
+        // profissional, o horário da própria agenda fica bloqueado (status "Bloqueado"),
+        // pois ainda não há rota própria para a grade de horários.
         [HttpPost]
-        [Authorize(Roles = PerfilDeUsuario.Paciente)]
+        [Authorize(Roles = PerfilDeUsuario.Paciente + "," + PerfilDeUsuario.Profissional)]
         public async Task<ActionResult<AgendamentoResponseDTO>> CreateAsync(
             [FromBody] AgendamentoCreateDTO dto)
         {
             var usuarioAtual = _usuarioAtualService.Obter();
-            if (usuarioAtual?.PerfilId is not Guid pacienteId)
+            if (usuarioAtual?.PerfilId is not Guid perfilId)
                 return Unauthorized(new { erro = "Usuário não identificado no token." });
 
             try
             {
-                var agendamento = new Entities.Agendamento
+                Entities.Agendamento criado;
+                if (usuarioAtual.TipoUsuario == PerfilDeUsuario.Profissional)
                 {
-                    PacienteId = pacienteId,
-                    ProfissionalId = dto.ProfissionalId,
-                    DataHora = dto.DataHora,
-                    Status = dto.Status?.Trim() ?? string.Empty,
-                    Observacoes = dto.Observacoes
-                };
+                    if (dto.ProfissionalId != perfilId)
+                        return StatusCode(
+                            StatusCodes.Status403Forbidden,
+                            new { erro = "O profissional só pode bloquear horários da própria agenda." });
 
-                var criado = await _agendamentoService.CreateForPatientAsync(agendamento, pacienteId);
+                    criado = await _agendamentoService.CreateBlockAsync(
+                        perfilId,
+                        dto.DataHora,
+                        dto.Observacoes);
+                }
+                else
+                {
+                    var agendamento = new Entities.Agendamento
+                    {
+                        PacienteId = perfilId,
+                        ProfissionalId = dto.ProfissionalId,
+                        DataHora = dto.DataHora,
+                        Status = dto.Status?.Trim() ?? string.Empty,
+                        Observacoes = dto.Observacoes
+                    };
+
+                    criado = await _agendamentoService.CreateForPatientAsync(agendamento, perfilId);
+                }
 
                 return CreatedAtRoute(
                     "ObterAgendamentoPorId",
