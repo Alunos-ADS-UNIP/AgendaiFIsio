@@ -38,15 +38,27 @@ void Check(bool condition, string name)
     Console.WriteLine("PASS: " + name);
     checks++;
 }
-async Task<JsonElement> Request(HttpMethod method, string path, object? body, HttpStatusCode expected, string name, string? token = null)
+async Task<(HttpStatusCode StatusCode, JsonElement Body)> Send(
+    HttpMethod method,
+    string path,
+    object? body,
+    string? token = null)
 {
     using var request = new HttpRequestMessage(method, path);
     if (body is not null) request.Content = JsonContent.Create(body);
     if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     using var response = await http.SendAsync(request);
-    Check(response.StatusCode == expected, name + " (HTTP " + (int)response.StatusCode + ")");
     var text = await response.Content.ReadAsStringAsync();
-    return string.IsNullOrWhiteSpace(text) ? default : JsonDocument.Parse(text).RootElement.Clone();
+    var parsed = string.IsNullOrWhiteSpace(text)
+        ? default
+        : JsonDocument.Parse(text).RootElement.Clone();
+    return (response.StatusCode, parsed);
+}
+async Task<JsonElement> Request(HttpMethod method, string path, object? body, HttpStatusCode expected, string name, string? token = null)
+{
+    var result = await Send(method, path, body, token);
+    Check(result.StatusCode == expected, name + " (HTTP " + (int)result.StatusCode + ")");
+    return result.Body;
 }
 string CreateExpiredToken()
 {
@@ -101,7 +113,10 @@ try
     {
         Check(true, "Data sem offset rejeitada");
     }
-    await Request(HttpMethod.Get, "/openapi/v1.json", null, HttpStatusCode.OK, "OpenAPI com pacote atualizado");
+    var openApi = await Request(HttpMethod.Get, "/openapi/v1.json", null, HttpStatusCode.OK, "OpenAPI com pacote atualizado");
+    Check(openApi.GetRawText().Contains("Bloqueia exatamente 60 minutos", StringComparison.Ordinal) &&
+        openApi.GetRawText().Contains("2026-11-03T09:00:00-03:00", StringComparison.Ordinal),
+        "OpenAPI documenta o contrato de hora cheia com exemplo");
     await Request(HttpMethod.Get, "/api/profissional", null, HttpStatusCode.Unauthorized, "Listagem exige autenticacao");
     foreach (var role in new[] { "Admin", "Clinica", "Desconhecido", "" })
         await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[2], senha = "Regression123!", tipoUsuario = role }, HttpStatusCode.BadRequest, "Cadastro rejeita papel " + role);
@@ -313,11 +328,19 @@ try
             b.GetProperty("id").GetGuid() == bloqueioHorarioId),
         "Listagem encontra o bloqueio dentro do periodo");
     var bloqueiosDoSegundoProfissional = await Request(HttpMethod.Get,
-        "/api/agenda/bloqueios", null, HttpStatusCode.OK,
+        "/api/agenda/bloqueios?inicio=" + Uri.EscapeDataString(horarioBloqueado.AddHours(-1).ToString("O")) +
+        "&fim=" + Uri.EscapeDataString(horarioBloqueado.AddHours(2).ToString("O")),
+        null, HttpStatusCode.OK,
         "Segundo profissional lista apenas a propria agenda", segundoProfissionalToken);
     Check(!bloqueiosDoSegundoProfissional.EnumerateArray().Any(b =>
             b.GetProperty("id").GetGuid() == bloqueioHorarioId),
         "Bloqueio nao vaza para outro profissional");
+    await Request(HttpMethod.Get, "/api/agenda/bloqueios", null, HttpStatusCode.BadRequest,
+        "Listagem de bloqueios exige periodo", professionalToken);
+    await Request(HttpMethod.Get,
+        "/api/agenda/bloqueios?inicio=" + Uri.EscapeDataString(horarioBloqueado.ToString("O")) +
+        "&fim=" + Uri.EscapeDataString(horarioBloqueado.AddDays(94).ToString("O")),
+        null, HttpStatusCode.BadRequest, "Listagem limita a janela a 93 dias", professionalToken);
     await Request(HttpMethod.Delete, "/api/agenda/bloqueios/" + bloqueioHorarioId,
         null, HttpStatusCode.NotFound,
         "Outro profissional nao remove bloqueio alheio", segundoProfissionalToken);
@@ -352,10 +375,76 @@ try
     db.Agendamentos.Remove(agendamentoAuxiliar!);
     await db.SaveChangesAsync();
 
-    var horario = DateTime.UtcNow.AddDays(10);
+    // Repete as três disputas para provar que a regra é serializada pelo banco e não depende
+    // apenas dos AnyAsync executados antes do SaveChanges.
+    for (var tentativa = 0; tentativa < 8; tentativa++)
+    {
+        var alvoConcorrente = DateTime.UtcNow.Date.AddDays(35 + tentativa).AddHours(10);
+
+        var doisBloqueios = await Task.WhenAll(
+            Send(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+                new { dataHora = alvoConcorrente, motivo = "Concorrencia A" }, professionalToken),
+            Send(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+                new { dataHora = alvoConcorrente, motivo = "Concorrencia B" }, professionalToken));
+        Check(doisBloqueios.Count(x => x.StatusCode == HttpStatusCode.Created) == 1 &&
+            doisBloqueios.Count(x => x.StatusCode == HttpStatusCode.Conflict) == 1,
+            $"Concorrencia {tentativa + 1}: somente um bloqueio sobreposto persiste");
+        var bloqueioConcorrenteId = doisBloqueios
+            .Single(x => x.StatusCode == HttpStatusCode.Created).Body.GetProperty("id").GetGuid();
+        await Request(HttpMethod.Delete, "/api/agenda/bloqueios/" + bloqueioConcorrenteId,
+            null, HttpStatusCode.NoContent, "Limpeza do bloqueio concorrente", professionalToken);
+
+        var bloqueioContraConsulta = await Task.WhenAll(
+            Send(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+                new { dataHora = alvoConcorrente, motivo = "Bloqueio contra consulta" }, professionalToken),
+            Send(HttpMethod.Post, "/api/agendamento",
+                new { profissionalId = professional.Id, dataHora = alvoConcorrente }, patientToken));
+        Check(bloqueioContraConsulta.Count(x => x.StatusCode == HttpStatusCode.Created) == 1 &&
+            bloqueioContraConsulta.Count(x => x.StatusCode == HttpStatusCode.Conflict) == 1,
+            $"Concorrencia {tentativa + 1}: bloqueio e consulta nao persistem juntos");
+        var bloqueioCriado = bloqueioContraConsulta
+            .FirstOrDefault(x => x.StatusCode == HttpStatusCode.Created &&
+                x.Body.TryGetProperty("tipo", out _));
+        if (bloqueioCriado.StatusCode == HttpStatusCode.Created)
+        {
+            await Request(HttpMethod.Delete,
+                "/api/agenda/bloqueios/" + bloqueioCriado.Body.GetProperty("id").GetGuid(),
+                null, HttpStatusCode.NoContent, "Limpeza do bloqueio disputado", professionalToken);
+        }
+        await db.Agendamentos
+            .Where(a => a.ProfissionalId == professional.Id && a.DataHora == alvoConcorrente)
+            .ExecuteDeleteAsync();
+
+        var origem = alvoConcorrente.AddHours(-2);
+        var consultaParaReagendar = await Request(HttpMethod.Post, "/api/agendamento",
+            new { profissionalId = professional.Id, dataHora = origem }, HttpStatusCode.Created,
+            "Cria consulta para disputa de reagendamento", patientToken);
+        var consultaParaReagendarId = consultaParaReagendar.GetProperty("id").GetGuid();
+        var reagendamentoContraBloqueio = await Task.WhenAll(
+            Send(HttpMethod.Put, $"/api/agendamento/{consultaParaReagendarId}/reagendar",
+                new { dataHora = alvoConcorrente }, patientToken),
+            Send(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+                new { dataHora = alvoConcorrente, motivo = "Contra reagendamento" }, professionalToken));
+        Check(reagendamentoContraBloqueio.Count(x =>
+                x.StatusCode is HttpStatusCode.OK or HttpStatusCode.Created) == 1 &&
+            reagendamentoContraBloqueio.Count(x => x.StatusCode == HttpStatusCode.Conflict) == 1,
+            $"Concorrencia {tentativa + 1}: reagendamento nao entra em periodo bloqueado");
+        var bloqueioDoReagendamento = reagendamentoContraBloqueio
+            .FirstOrDefault(x => x.StatusCode == HttpStatusCode.Created);
+        if (bloqueioDoReagendamento.StatusCode == HttpStatusCode.Created)
+        {
+            await Request(HttpMethod.Delete,
+                "/api/agenda/bloqueios/" + bloqueioDoReagendamento.Body.GetProperty("id").GetGuid(),
+                null, HttpStatusCode.NoContent, "Limpeza do bloqueio contra reagendamento", professionalToken);
+        }
+        await db.Agendamentos.Where(a => a.Id == consultaParaReagendarId).ExecuteDeleteAsync();
+    }
+
+    var horario = DateTime.UtcNow.Date.AddDays(10).AddHours(13);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = DateTime.UtcNow.AddMinutes(-5), status = "Agendado" }, HttpStatusCode.BadRequest, "Agenda rejeita horario passado", patientToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario, status = "Invalido" }, HttpStatusCode.BadRequest, "Agenda rejeita status invalido", patientToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario.ToString("yyyy-MM-ddTHH:mm:ss") }, HttpStatusCode.BadRequest, "Agenda rejeita data sem offset", patientToken);
+    await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario.AddMinutes(30) }, HttpStatusCode.BadRequest, "Agenda exige hora cheia", patientToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario }, HttpStatusCode.Forbidden, "Profissional nao cria vinculo arbitrario", professionalToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario }, HttpStatusCode.Forbidden, "Clinica usa somente fluxo administrativo", adminToken);
     await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.NotFound, "Tentativa de vinculo nao libera historico", professionalToken);
@@ -484,6 +573,8 @@ try
         HttpStatusCode.BadRequest, "Reagendamento rejeita data sem offset", patientToken);
     await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = DateTime.UtcNow.AddMinutes(-5) },
         HttpStatusCode.BadRequest, "Reagendamento rejeita horario passado", patientToken);
+    await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(4).AddMinutes(30) },
+        HttpStatusCode.BadRequest, "Reagendamento exige hora cheia", patientToken);
     await Request(HttpMethod.Put, rotaReagendamento, new { dataHora = horario.AddHours(4) },
         HttpStatusCode.NotFound, "Outro paciente nao reagenda consulta alheia", segundoPacienteToken);
     await Request(HttpMethod.Patch, rotaCancelamento, null,

@@ -200,8 +200,13 @@ public class AgendamentoService : IAgendamentoService
             await _context.SaveChangesAsync();
         }
         catch (DbUpdateException ex) when (
-            ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            ex.InnerException is PostgresException postgres &&
+            postgres.SqlState is PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ExclusionViolation)
         {
+            if (postgres.ConstraintName == "CK_Agendamentos_SemBloqueio")
+                throw new InvalidOperationException(
+                    "O horário está bloqueado pelo profissional.", ex);
+
             throw new InvalidOperationException(
                 "O profissional já possui um agendamento nesse horário.", ex);
         }

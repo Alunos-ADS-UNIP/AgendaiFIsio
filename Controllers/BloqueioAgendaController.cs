@@ -37,8 +37,7 @@ public sealed class BloqueioAgendaController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<BloqueioAgendaResponseDTO>>> ListarAsync(
-        [FromQuery] DateTimeOffset? inicio,
-        [FromQuery] DateTimeOffset? fim)
+        [FromQuery] BloqueioAgendaFiltroDTO filtro)
     {
         if (!TryObterProfissionalId(out var profissionalId))
             return Unauthorized(new { erro = "Profissional não identificado no token." });
@@ -47,8 +46,8 @@ public sealed class BloqueioAgendaController : ControllerBase
         {
             var bloqueios = await _bloqueioAgendaService.ListarAsync(
                 profissionalId,
-                inicio?.UtcDateTime,
-                fim?.UtcDateTime);
+                filtro.Inicio!.Value.UtcDateTime,
+                filtro.Fim!.Value.UtcDateTime);
             return Ok(bloqueios.Select(ToResponse).ToList());
         }
         catch (ArgumentException ex)

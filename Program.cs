@@ -82,6 +82,7 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
     options.AddOperationTransformer<AuthOperationTransformer>();
+    options.AddOperationTransformer<BloqueioAgendaOperationTransformer>();
 });
 
 var app = builder.Build();

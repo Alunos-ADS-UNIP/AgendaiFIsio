@@ -8,8 +8,8 @@ public interface IBloqueioAgendaService
 
     Task<IReadOnlyList<Entities.BloqueioAgenda>> ListarAsync(
         Guid profissionalId,
-        DateTime? inicio,
-        DateTime? fim);
+        DateTime inicio,
+        DateTime fim);
 
     Task<Entities.BloqueioAgenda> CriarHorarioAsync(
         Guid profissionalId,

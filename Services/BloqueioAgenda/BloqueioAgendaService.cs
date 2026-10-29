@@ -1,12 +1,14 @@
 using AgendaiFisio.Constants;
 using AgendaiFisio.Context;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace AgendaiFisio.Services.BloqueioAgenda;
 
 public sealed class BloqueioAgendaService : IBloqueioAgendaService
 {
     private const string FusoHorarioAgenda = "America/Sao_Paulo";
+    private static readonly TimeSpan JanelaMaximaConsulta = TimeSpan.FromDays(93);
     private readonly AgendaiFisioDbContext _context;
 
     public BloqueioAgendaService(AgendaiFisioDbContext context)
@@ -20,19 +22,20 @@ public sealed class BloqueioAgendaService : IBloqueioAgendaService
 
     public async Task<IReadOnlyList<Entities.BloqueioAgenda>> ListarAsync(
         Guid profissionalId,
-        DateTime? inicio,
-        DateTime? fim)
+        DateTime inicio,
+        DateTime fim)
     {
-        if (inicio.HasValue && fim.HasValue && fim <= inicio)
+        if (inicio.Kind != DateTimeKind.Utc || fim.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("O período deve estar em UTC.");
+        if (fim <= inicio)
             throw new ArgumentException("O fim do período deve ser posterior ao início.");
+        if (fim - inicio > JanelaMaximaConsulta)
+            throw new ArgumentException("O período consultado deve ter no máximo 93 dias.");
 
         var query = _context.BloqueiosAgenda.AsNoTracking()
-            .Where(b => b.ProfissionalId == profissionalId);
-
-        if (inicio.HasValue)
-            query = query.Where(b => b.Fim > inicio.Value);
-        if (fim.HasValue)
-            query = query.Where(b => b.Inicio < fim.Value);
+            .Where(b => b.ProfissionalId == profissionalId &&
+                b.Fim > inicio &&
+                b.Inicio < fim);
 
         return await query.OrderBy(b => b.Inicio).ToListAsync();
     }
@@ -134,7 +137,20 @@ public sealed class BloqueioAgendaService : IBloqueioAgendaService
         };
 
         _context.BloqueiosAgenda.Add(bloqueio);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException is PostgresException postgres &&
+            postgres.SqlState == PostgresErrorCodes.ExclusionViolation)
+        {
+            var mensagem = postgres.ConstraintName == "CK_BloqueiosAgenda_SemConsulta"
+                ? "O período possui uma consulta e não pode ser bloqueado."
+                : "O período informado já possui um bloqueio.";
+            throw new InvalidOperationException(mensagem, ex);
+        }
+
         return bloqueio;
     }
 }
