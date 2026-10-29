@@ -4,6 +4,7 @@ using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Agendamento;
 using AgendaiFisio.Services.Auth;
 using AgendaiFisio.Constants;
+using AgendaiFisio.Validations;
 
 namespace AgendaiFisio.Controllers
 {
@@ -64,7 +65,6 @@ namespace AgendaiFisio.Controllers
 
         // Reserva um horário para o próprio paciente autenticado. Quando quem chama é o
         // profissional, o horário da própria agenda fica bloqueado (status "Bloqueado"),
-        // pois ainda não há rota própria para a grade de horários.
         [HttpPost]
         [Authorize(Roles = PerfilDeUsuario.Paciente + "," + PerfilDeUsuario.Profissional)]
         public async Task<ActionResult<AgendamentoResponseDTO>> CreateAsync(
@@ -107,6 +107,10 @@ namespace AgendaiFisio.Controllers
                     "ObterAgendamentoPorId",
                     new { id = criado.Id },
                     ToResponse(criado));
+            }
+            catch (CadastroIncompletoException ex)
+            {
+                return UnprocessableEntity(new { erro = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
