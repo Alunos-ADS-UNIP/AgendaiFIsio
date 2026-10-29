@@ -73,62 +73,6 @@ public class AgendamentoService : IAgendamentoService
     public Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento)
         => ValidateAndCreateAsync(agendamento);
 
-    // Ocupa um horário da própria agenda do profissional com um agendamento "Bloqueado",
-    // ligado ao paciente técnico, para que nenhum paciente consiga reservá-lo.
-    public async Task<Entities.Agendamento> CreateBlockAsync(
-        Guid profissionalId,
-        DateTime dataHora,
-        string? observacoes)
-    {
-        await GarantirPacienteDeBloqueioAsync();
-
-        var bloqueio = new Entities.Agendamento
-        {
-            PacienteId = BloqueioDeAgenda.PacienteId,
-            ProfissionalId = profissionalId,
-            DataHora = dataHora,
-            Status = StatusAgendamento.Bloqueado,
-            Observacoes = observacoes
-        };
-
-        return await ValidateAndCreateAsync(bloqueio);
-    }
-
-    // Cria na primeira utilização o paciente técnico dos bloqueios, sem depender de migration.
-    private async Task GarantirPacienteDeBloqueioAsync()
-    {
-        if (await _context.Pacientes.AnyAsync(p => p.Id == BloqueioDeAgenda.PacienteId))
-            return;
-
-        _context.Pacientes.Add(new Entities.Paciente
-        {
-            Id = BloqueioDeAgenda.PacienteId,
-            NomeCompleto = BloqueioDeAgenda.NomePaciente,
-            DataNascimento = new DateTime(2000, 1, 1),
-            Endereco = new Endereco { Id = BloqueioDeAgenda.EnderecoId },
-            UsuarioId = BloqueioDeAgenda.UsuarioId,
-            Usuario = new Usuario
-            {
-                Id = BloqueioDeAgenda.UsuarioId,
-                Email = BloqueioDeAgenda.Email,
-                // Hash de uma senha aleatória descartada: ninguém consegue entrar com este usuário.
-                SenhaHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
-                TipoUsuario = BloqueioDeAgenda.TipoUsuario
-            }
-        });
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateException ex) when (
-            ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            // Outra requisição criou o paciente ao mesmo tempo; descarta a cópia local.
-            _context.ChangeTracker.Clear();
-        }
-    }
-
     // Confere as entidades envolvidas e reserva o horário quando ele está disponível.
     private async Task<Entities.Agendamento> ValidateAndCreateAsync(
         Entities.Agendamento agendamento)
@@ -156,6 +100,9 @@ public class AgendamentoService : IAgendamentoService
 
         if (horarioOcupado)
             throw new InvalidOperationException("O profissional já possui um agendamento nesse horário.");
+
+        if (await ExisteBloqueioAsync(agendamento.ProfissionalId, agendamento.DataHora))
+            throw new InvalidOperationException("O horário está bloqueado pelo profissional.");
 
         agendamento.Status = NormalizarStatus(agendamento.Status);
 
@@ -209,6 +156,9 @@ public class AgendamentoService : IAgendamentoService
         if (horarioOcupado)
             throw new InvalidOperationException(
                 "O profissional já possui um agendamento nesse horário.");
+
+        if (await ExisteBloqueioAsync(agendamento.ProfissionalId, novaDataHora))
+            throw new InvalidOperationException("O horário está bloqueado pelo profissional.");
 
         agendamento.DataHora = novaDataHora;
         await SalvarTratandoConflitoDeHorarioAsync();
@@ -267,9 +217,14 @@ public class AgendamentoService : IAgendamentoService
         if (StatusIgual(valor, StatusAgendamento.Confirmado)) return StatusAgendamento.Confirmado;
         if (StatusIgual(valor, StatusAgendamento.Cancelado)) return StatusAgendamento.Cancelado;
         if (StatusIgual(valor, StatusAgendamento.Concluido)) return StatusAgendamento.Concluido;
-        if (StatusIgual(valor, StatusAgendamento.Bloqueado)) return StatusAgendamento.Bloqueado;
         return valor;
     }
+
+    private Task<bool> ExisteBloqueioAsync(Guid profissionalId, DateTime dataHora) =>
+        _context.BloqueiosAgenda.AsNoTracking().AnyAsync(b =>
+            b.ProfissionalId == profissionalId &&
+            b.Inicio <= dataHora &&
+            b.Fim > dataHora);
 
     private static bool StatusIgual(string atual, string esperado) =>
         string.Equals(atual, esperado, StringComparison.OrdinalIgnoreCase);

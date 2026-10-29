@@ -18,7 +18,7 @@ namespace AgendaiFisio.Migrations.Postgres
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("Npgsql:CollationDefinition:case_accent_insensitive", "und-u-ks-primary,und-u-ks-primary,icu,False")
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -98,6 +98,43 @@ namespace AgendaiFisio.Migrations.Postgres
                     b.HasIndex("ProfissionalId");
 
                     b.ToTable("AvaliacaoFisioterapeuta");
+                });
+
+            modelBuilder.Entity("AgendaiFisio.Entities.BloqueioAgenda", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("Fim")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("Inicio")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("ProfissionalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfissionalId", "Inicio");
+
+                    b.ToTable("BloqueiosAgenda", t =>
+                        {
+                            t.HasCheckConstraint("CK_BloqueiosAgenda_Intervalo", "\"Fim\" > \"Inicio\"");
+                        });
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Endereco", b =>
@@ -434,6 +471,17 @@ namespace AgendaiFisio.Migrations.Postgres
                         .IsRequired();
 
                     b.Navigation("Paciente");
+
+                    b.Navigation("Profissional");
+                });
+
+            modelBuilder.Entity("AgendaiFisio.Entities.BloqueioAgenda", b =>
+                {
+                    b.HasOne("AgendaiFisio.Entities.Profissional", "Profissional")
+                        .WithMany()
+                        .HasForeignKey("ProfissionalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Profissional");
                 });

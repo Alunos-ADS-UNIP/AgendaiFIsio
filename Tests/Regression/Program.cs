@@ -279,6 +279,79 @@ try
         historicoInicial.GetProperty("totalRegistros").GetInt32() == 0, "Historico vazio retorna pagina vazia");
 
     await Request(HttpMethod.Get, "/api/agendamento", null, HttpStatusCode.Unauthorized, "Agenda exige autenticacao");
+    await Request(HttpMethod.Get, "/api/agenda/bloqueios", null, HttpStatusCode.Unauthorized,
+        "Bloqueios exigem autenticacao");
+    var horarioBloqueado = DateTime.UtcNow.Date.AddDays(14).AddHours(12);
+    await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+        new { dataHora = horarioBloqueado }, HttpStatusCode.Forbidden,
+        "Paciente nao bloqueia agenda", patientToken);
+    await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+        new { dataHora = horarioBloqueado }, HttpStatusCode.Forbidden,
+        "Clinica nao bloqueia agenda do profissional", adminToken);
+    await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+        new { dataHora = horarioBloqueado.AddMinutes(30) }, HttpStatusCode.BadRequest,
+        "Bloqueio de horario exige hora cheia", professionalToken);
+    var bloqueioHorario = await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+        new { dataHora = horarioBloqueado, motivo = "Compromisso pessoal" },
+        HttpStatusCode.Created, "Profissional bloqueia uma hora", professionalToken);
+    var bloqueioHorarioId = bloqueioHorario.GetProperty("id").GetGuid();
+    Check(bloqueioHorario.GetProperty("tipo").GetString() == TipoBloqueioAgenda.Horario &&
+        bloqueioHorario.GetProperty("inicio").GetDateTime() == horarioBloqueado &&
+        bloqueioHorario.GetProperty("fim").GetDateTime() == horarioBloqueado.AddHours(1),
+        "Bloqueio de horario persiste intervalo de uma hora");
+    await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+        new { dataHora = horarioBloqueado }, HttpStatusCode.Conflict,
+        "Bloqueios sobrepostos sao rejeitados", professionalToken);
+    await Request(HttpMethod.Post, "/api/agendamento",
+        new { profissionalId = professional.Id, dataHora = horarioBloqueado },
+        HttpStatusCode.Conflict, "Paciente nao agenda horario bloqueado", patientToken);
+    var bloqueiosDoProfissional = await Request(HttpMethod.Get,
+        "/api/agenda/bloqueios?inicio=" + Uri.EscapeDataString(horarioBloqueado.AddHours(-1).ToString("O")) +
+        "&fim=" + Uri.EscapeDataString(horarioBloqueado.AddHours(2).ToString("O")),
+        null, HttpStatusCode.OK, "Profissional lista os proprios bloqueios", professionalToken);
+    Check(bloqueiosDoProfissional.EnumerateArray().Any(b =>
+            b.GetProperty("id").GetGuid() == bloqueioHorarioId),
+        "Listagem encontra o bloqueio dentro do periodo");
+    var bloqueiosDoSegundoProfissional = await Request(HttpMethod.Get,
+        "/api/agenda/bloqueios", null, HttpStatusCode.OK,
+        "Segundo profissional lista apenas a propria agenda", segundoProfissionalToken);
+    Check(!bloqueiosDoSegundoProfissional.EnumerateArray().Any(b =>
+            b.GetProperty("id").GetGuid() == bloqueioHorarioId),
+        "Bloqueio nao vaza para outro profissional");
+    await Request(HttpMethod.Delete, "/api/agenda/bloqueios/" + bloqueioHorarioId,
+        null, HttpStatusCode.NotFound,
+        "Outro profissional nao remove bloqueio alheio", segundoProfissionalToken);
+    await Request(HttpMethod.Delete, "/api/agenda/bloqueios/" + bloqueioHorarioId,
+        null, HttpStatusCode.NoContent,
+        "Profissional desbloqueia o proprio horario", professionalToken);
+    var agendamentoAposDesbloqueio = await Request(HttpMethod.Post, "/api/agendamento",
+        new { profissionalId = professional.Id, dataHora = horarioBloqueado },
+        HttpStatusCode.Created, "Horario desbloqueado pode ser agendado", patientToken);
+    await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
+        new { dataHora = horarioBloqueado }, HttpStatusCode.Conflict,
+        "Consulta existente impede bloqueio do horario", professionalToken);
+
+    var diaBloqueado = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20));
+    var bloqueioDia = await Request(HttpMethod.Post, "/api/agenda/bloqueios/dias",
+        new { data = diaBloqueado.ToString("yyyy-MM-dd"), motivo = "Congresso" },
+        HttpStatusCode.Created, "Profissional bloqueia dia completo", professionalToken);
+    var bloqueioDiaId = bloqueioDia.GetProperty("id").GetGuid();
+    Check(bloqueioDia.GetProperty("tipo").GetString() == TipoBloqueioAgenda.DiaCompleto &&
+        bloqueioDia.GetProperty("fim").GetDateTime() - bloqueioDia.GetProperty("inicio").GetDateTime() == TimeSpan.FromHours(24),
+        "Dia completo usa o dia civil de Sao Paulo");
+    var horarioDentroDoDia = DateTime.SpecifyKind(
+        diaBloqueado.ToDateTime(new TimeOnly(15, 0)), DateTimeKind.Utc);
+    await Request(HttpMethod.Post, "/api/agendamento",
+        new { profissionalId = professional.Id, dataHora = horarioDentroDoDia },
+        HttpStatusCode.Conflict, "Dia completo bloqueia todos os horarios", patientToken);
+    await Request(HttpMethod.Delete, "/api/agenda/bloqueios/" + bloqueioDiaId,
+        null, HttpStatusCode.NoContent,
+        "Profissional desbloqueia dia completo", professionalToken);
+    var agendamentoAuxiliar = await db.Agendamentos.FindAsync(
+        agendamentoAposDesbloqueio.GetProperty("id").GetGuid());
+    db.Agendamentos.Remove(agendamentoAuxiliar!);
+    await db.SaveChangesAsync();
+
     var horario = DateTime.UtcNow.AddDays(10);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = DateTime.UtcNow.AddMinutes(-5), status = "Agendado" }, HttpStatusCode.BadRequest, "Agenda rejeita horario passado", patientToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario, status = "Invalido" }, HttpStatusCode.BadRequest, "Agenda rejeita status invalido", patientToken);
@@ -488,6 +561,8 @@ finally
     var professionals = await db.Profissionais.Where(p => emails.Contains(p.Usuario.Email)).ToListAsync();
     var patientIds = patients.Select(p => p.Id).ToArray();
     var professionalIds = professionals.Select(p => p.Id).ToArray();
+    db.BloqueiosAgenda.RemoveRange(await db.BloqueiosAgenda
+        .Where(b => professionalIds.Contains(b.ProfissionalId)).ToListAsync());
     db.Agendamentos.RemoveRange(await db.Agendamentos.Where(a => patientIds.Contains(a.PacienteId) || professionalIds.Contains(a.ProfissionalId)).ToListAsync());
     db.Enderecos.RemoveRange(patients.Select(p => p.Endereco));
     db.Pacientes.RemoveRange(patients);

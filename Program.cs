@@ -11,6 +11,7 @@ using AgendaiFisio.Services.Especialidade;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Services.Profissional;
 using AgendaiFisio.Services.Agendamento;
+using AgendaiFisio.Services.BloqueioAgenda;
 using AgendaiFisio.OpenApi;
 using AgendaiFisio.Infrastructure;
 
@@ -42,6 +43,7 @@ builder.Services.AddScoped<IPacienteService, PacienteService>();
 builder.Services.AddScoped<IProfissionalService, ProfissionalService>();
 builder.Services.AddScoped<IEspecialidadeService, EspecialidadeService>();
 builder.Services.AddScoped<IAgendamentoService, AgendamentoService>();
+builder.Services.AddScoped<IBloqueioAgendaService, BloqueioAgendaService>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings.GetValue<string>("SecretKey");
