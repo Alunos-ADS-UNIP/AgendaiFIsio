@@ -34,9 +34,7 @@ namespace AgendaiFisio.Services.Paciente
 
         public async Task<PagedResultDTO<PacienteListItemDTO>> ListarAsync(PacienteFiltroDTO filtro)
         {
-            // O paciente técnico dos bloqueios de agenda não é uma pessoa e nunca aparece na busca.
-            var query = _context.Pacientes.AsNoTracking()
-                .Where(p => p.Id != BloqueioDeAgenda.PacienteId);
+            var query = _context.Pacientes.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(filtro.Busca))
             {

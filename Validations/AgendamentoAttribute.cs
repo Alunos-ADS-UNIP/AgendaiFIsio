@@ -64,6 +64,15 @@ public class AgendamentoAttribute : ValidationAttribute
                 new[] { nameof(IAgendamentoValidavel.DataHora) });
         }
 
+        if (agendamento.DataHora.Minute != 0 ||
+            agendamento.DataHora.Second != 0 ||
+            agendamento.DataHora.Millisecond != 0)
+        {
+            return new ValidationResult(
+                "O agendamento deve começar em uma hora cheia, como 09:00 ou 10:00.",
+                new[] { nameof(IAgendamentoValidavel.DataHora) });
+        }
+
         if (!string.IsNullOrWhiteSpace(agendamento.Status) &&
             !StatusPermitidos.Contains(agendamento.Status.Trim()))
         {

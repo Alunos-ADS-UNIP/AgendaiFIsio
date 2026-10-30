@@ -23,6 +23,7 @@ namespace AgendaiFisio.Context
         public DbSet<Endereco> Enderecos { get; set; }
         public DbSet<Especialidade> Especialidades { get; set; }
         public DbSet<Agendamento> Agendamentos { get; set; }
+        public DbSet<BloqueioAgenda> BloqueiosAgenda { get; set; }
 
 
 
@@ -126,6 +127,25 @@ namespace AgendaiFisio.Context
             // Sustenta a paginação do histórico de consultas de um paciente por data.
             modelBuilder.Entity<Agendamento>()
                 .HasIndex(a => new { a.PacienteId, a.DataHora });
+
+            modelBuilder.Entity<BloqueioAgenda>(b =>
+            {
+                b.HasOne(x => x.Profissional)
+                    .WithMany()
+                    .HasForeignKey(x => x.ProfissionalId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                b.Property(x => x.Tipo)
+                    .HasMaxLength(20)
+                    .IsRequired();
+                b.Property(x => x.Motivo)
+                    .HasMaxLength(500);
+
+                b.HasIndex(x => new { x.ProfissionalId, x.Inicio });
+                b.ToTable(t => t.HasCheckConstraint(
+                    "CK_BloqueiosAgenda_Intervalo",
+                    "\"Fim\" > \"Inicio\""));
+            });
         }
         
     }

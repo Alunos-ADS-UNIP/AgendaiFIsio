@@ -34,5 +34,12 @@ public sealed class ReagendamentoDTO : IValidatableObject
                 "O reagendamento deve ser marcado para uma data e hora futuras.",
                 new[] { nameof(DataHora) });
         }
+
+        if (DataHora.Minute != 0 || DataHora.Second != 0 || DataHora.Millisecond != 0)
+        {
+            yield return new ValidationResult(
+                "O reagendamento deve começar em uma hora cheia, como 09:00 ou 10:00.",
+                new[] { nameof(DataHora) });
+        }
     }
 }
