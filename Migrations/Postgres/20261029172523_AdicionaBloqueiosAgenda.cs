@@ -207,14 +207,24 @@ namespace AgendaiFisio.Migrations.Postgres
                 INSERT INTO "Agendamentos"
                     ("Id", "PacienteId", "ProfissionalId", "DataHora", "Status", "Observacoes")
                 SELECT
-                    "Id",
+                    CASE
+                        WHEN horario = b."Inicio"
+                             AND NOT EXISTS (
+                                 SELECT 1 FROM "Agendamentos" a WHERE a."Id" = b."Id")
+                            THEN b."Id"
+                        ELSE gen_random_uuid()
+                    END,
                     'b10c0000-0000-4000-8000-000000000001',
-                    "ProfissionalId",
-                    "Inicio",
+                    b."ProfissionalId",
+                    horario,
                     'Bloqueado',
-                    "Motivo"
-                FROM "BloqueiosAgenda"
-                ON CONFLICT ("Id") DO NOTHING;
+                    b."Motivo"
+                FROM "BloqueiosAgenda" b
+                CROSS JOIN LATERAL generate_series(
+                    b."Inicio",
+                    b."Fim",
+                    INTERVAL '1 hour') AS slots(horario)
+                WHERE horario < b."Fim";
                 """);
 
             migrationBuilder.DropTable(

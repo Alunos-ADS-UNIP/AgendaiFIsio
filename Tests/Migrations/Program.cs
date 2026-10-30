@@ -71,6 +71,9 @@ var realAddressId = Guid.NewGuid();
 var oldBlockId = Guid.NewGuid();
 var realAppointmentId = Guid.NewGuid();
 var oldBlockTime = DateTime.UtcNow.Date.AddDays(20).AddHours(9);
+var variableBlockId = Guid.NewGuid();
+var variableBlockStart = oldBlockTime.AddDays(5).AddHours(-6);
+var variableBlockEnd = variableBlockStart.AddHours(23);
 
 try
 {
@@ -189,6 +192,18 @@ try
               await context.Agendamentos.AnyAsync(a => a.Id == realAppointmentId),
             "Paciente e consulta reais são preservados");
 
+        context.BloqueiosAgenda.Add(new BloqueioAgenda
+        {
+            Id = variableBlockId,
+            ProfissionalId = professionalId,
+            Inicio = variableBlockStart,
+            Fim = variableBlockEnd,
+            Tipo = "DiaCompleto",
+            Motivo = "Bloqueio de duração variável",
+            CriadoEm = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
         await context.Database.GetService<IMigrator>().MigrateAsync(InitialMigration);
         Check(!await TableExistsAsync("BloqueiosAgenda"),
             "Rollback legado remove a tabela depois de restaurar os dados");
@@ -201,7 +216,28 @@ try
               restored.ProfissionalId == professionalId &&
               restored.DataHora == oldBlockTime &&
               restored.Observacoes == "Reunião externa",
-            "Rollback restaura o bloqueio no contrato antigo sem perda silenciosa");
+            "Rollback preserva o ID original no primeiro horário quando disponível");
+
+        var expectedHours = new List<DateTime>();
+        for (var hour = variableBlockStart; hour < variableBlockEnd; hour = hour.AddHours(1))
+            expectedHours.Add(hour);
+
+        var expanded = await context.Agendamentos.AsNoTracking()
+            .Where(a => a.ProfissionalId == professionalId &&
+                        a.Status == "Bloqueado" &&
+                        a.DataHora >= variableBlockStart &&
+                        a.DataHora <= variableBlockEnd)
+            .OrderBy(a => a.DataHora)
+            .ToListAsync();
+        Check(expanded.Select(a => a.DataHora).SequenceEqual(expectedHours),
+            "Rollback gera uma entrada por hora até Fim, com limite final exclusivo");
+        Check(expanded.Count == expectedHours.Count &&
+              expanded.All(a => a.Observacoes == "Bloqueio de duração variável"),
+            "Rollback respeita a duração efetivamente salva e preserva o motivo");
+        Check(expanded[0].Id == variableBlockId &&
+              expanded.Select(a => a.Id).Distinct().Count() == expanded.Count &&
+              expanded.Skip(1).All(a => a.Id != variableBlockId),
+            "Rollback preserva o primeiro ID e usa IDs diferentes nos horários adicionais");
         Check(await context.Pacientes.AnyAsync(p => p.Id == realPatientId),
             "Rollback preserva paciente real");
     }

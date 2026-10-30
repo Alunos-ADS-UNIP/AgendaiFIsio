@@ -52,9 +52,10 @@ sobrepostos. Conflitos retornam HTTP 409.
 ## Migração e rollout
 
 A migration converte agendamentos antigos com status `Bloqueado` para a tabela de intervalos e
-remove somente o paciente técnico conhecido. O rollback recria os registros técnicos e converte
-os intervalos de volta antes de remover a tabela; se houver conflito, a transação falha em vez de
-perder bloqueios silenciosamente.
+remove somente o paciente técnico conhecido. O rollback recria os registros técnicos e expande
+cada intervalo em agendamentos técnicos de uma hora, de `Inicio` até antes de `Fim`. O primeiro
+horário preserva o ID do bloqueio quando ele estiver disponível; os demais recebem IDs próprios.
+Se houver conflito de agenda, a transação falha em vez de perder bloqueios silenciosamente.
 
 Ordem de publicação:
 
