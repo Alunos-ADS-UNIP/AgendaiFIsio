@@ -13,6 +13,9 @@ namespace AgendaiFisio.Services.Profissional
         // Devolve os dados completos de um fisioterapeuta pelo id.
         Task<ProfissionalDetailDTO> ObterPorIdAsync(Guid id);
 
+        // Devolve o perfil do próprio fisioterapeuta logado, incluindo CPF e data de nascimento.
+        Task<ProfissionalMeDTO> ObterMeuPerfilAsync(Guid usuarioId);
+
         // Atualiza o perfil do fisioterapeuta identificado pelo usuário logado.
         Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto);
 

@@ -97,6 +97,39 @@ namespace AgendaiFisio.Services.Profissional
             };
         }
 
+        public async Task<ProfissionalMeDTO> ObterMeuPerfilAsync(Guid usuarioId)
+        {
+            var profissional = await _context.Profissionais
+                .AsNoTracking()
+                .Include(p => p.Usuario)
+                .Include(p => p.Especialidade)
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
+
+            if (profissional is null)
+            {
+                throw new KeyNotFoundException("Fisioterapeuta não encontrado.");
+            }
+
+            return new ProfissionalMeDTO
+            {
+                Id = profissional.Id,
+                NomeCompleto = profissional.NomeCompleto,
+                Crefito = profissional.Crefito,
+                Telefone = profissional.Telefone,
+                Especialidade = profissional.Especialidade is null
+                    ? null
+                    : new EspecialidadeResponseDTO { Id = profissional.Especialidade.Id, Nome = profissional.Especialidade.Nome },
+                Bio = profissional.Bio,
+                DataCadastro = profissional.DataCadastro,
+                Ativo = profissional.Ativo,
+                Email = profissional.Usuario?.Email ?? string.Empty,
+                Cpf = profissional.Cpf,
+                DataNascimento = profissional.DataNascimento.Year > 1
+                    ? DateTime.SpecifyKind(profissional.DataNascimento, DateTimeKind.Unspecified)
+                    : null
+            };
+        }
+
         public async Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto)
         {
             var profissional = await _context.Profissionais

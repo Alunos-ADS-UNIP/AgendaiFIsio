@@ -47,6 +47,26 @@ namespace AgendaiFisio.Controllers
             }
         }
 
+        // Retorna o perfil do próprio fisioterapeuta logado, com CPF e data de nascimento.
+        // Esses dados não aparecem no detalhe público (GET api/profissional/{id}).
+        [HttpGet("me")]
+        [Authorize(Roles = "Profissional")]
+        public async Task<IActionResult> ObterMeuPerfil()
+        {
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                return Ok(await _profissionalService.ObterMeuPerfilAsync(usuarioAtual.UsuarioId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+        }
+
         // Retorna os dados completos de um fisioterapeuta específico.
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> ObterPorId(Guid id)

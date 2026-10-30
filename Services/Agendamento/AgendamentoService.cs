@@ -2,6 +2,7 @@ using AgendaiFisio.Context;
 using AgendaiFisio.Entities;
 using Microsoft.EntityFrameworkCore;
 using AgendaiFisio.Constants;
+using AgendaiFisio.Validations;
 using Npgsql;
 
 namespace AgendaiFisio.Services.Agendamento;
@@ -61,12 +62,24 @@ public class AgendamentoService : IAgendamentoService
     }
 
     // Cria um agendamento usando exclusivamente o perfil assinado no token do paciente.
-    public Task<Entities.Agendamento> CreateForPatientAsync(
+    public async Task<Entities.Agendamento> CreateForPatientAsync(
         Entities.Agendamento agendamento,
         Guid pacienteId)
     {
+        var paciente = await _context.Pacientes
+            .AsNoTracking()
+            .Include(p => p.Endereco)
+            .FirstOrDefaultAsync(p => p.Id == pacienteId);
+
+        if (paciente is null)
+            throw new KeyNotFoundException("Paciente não encontrado.");
+
+        if (!CadastroPacienteCompleto.Verificar(paciente))
+            throw new CadastroIncompletoException(
+                "Complete seu cadastro (nome, CPF, data de nascimento, telefone e endereço) antes de agendar.");
+
         agendamento.PacienteId = pacienteId;
-        return ValidateAndCreateAsync(agendamento);
+        return await ValidateAndCreateAsync(agendamento);
     }
 
     // Fluxo separado para a Clínica operar em nome de um paciente explícito.
