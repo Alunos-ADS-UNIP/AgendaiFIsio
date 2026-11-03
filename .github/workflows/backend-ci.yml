@@ -1,0 +1,88 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-migrations-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agendaifisio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agendaifisio_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: Host=127.0.0.1;Port=5432;Database=agendaifisio_test;Username=postgres;Password=postgres;SSL Mode=Disable
+      DATABASE_URL_UNPOOLED: Host=127.0.0.1;Port=5432;Database=agendaifisio_test;Username=postgres;Password=postgres;SSL Mode=Disable
+      MIGRATION_TEST_DATABASE_URL: Host=127.0.0.1;Port=5432;Database=agendaifisio_test;Username=postgres;Password=postgres;SSL Mode=Disable
+      MIGRATION_TEST_ALLOW_RESET: "true"
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://127.0.0.1:5187
+      JwtSettings__SecretKey: ci-only-secret-key-with-more-than-thirty-two-characters
+      JwtSettings__Issuer: AgendaiFisioCI
+      JwtSettings__Audience: AgendaiFisioCIClients
+      JwtSettings__ExpirationHours: 1
+      AdminSeed__Email: ci-admin@example.invalid
+      AdminSeed__Senha: Regression123!
+      RegressionAdmin__Email: ci-admin@example.invalid
+      RegressionAdmin__Senha: Regression123!
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore and build
+        run: |
+          dotnet restore AgendaiFisio.csproj
+          dotnet build AgendaiFisio.csproj -c Release --no-restore
+          dotnet build Tests/Migrations/MigrationTests.csproj -c Release
+          dotnet build Tests/Regression/Regression.csproj -c Release
+
+      - name: Test migration Up and Down
+        run: dotnet run --project Tests/Migrations/MigrationTests.csproj -c Release --no-build
+
+      - name: Run API regression and concurrency tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet run --project AgendaiFisio.csproj -c Release --no-build --no-launch-profile > /tmp/agendaifisio-api.log 2>&1 &
+          api_pid=$!
+          cleanup() {
+            status=$?
+            if [[ $status -ne 0 ]]; then
+              cat /tmp/agendaifisio-api.log
+            fi
+            kill "$api_pid" 2>/dev/null || true
+            wait "$api_pid" 2>/dev/null || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5187/health >/dev/null; then
+              break
+            fi
+            if [[ $attempt -eq 30 ]]; then
+              echo "API did not become healthy"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          dotnet run --project Tests/Regression/Regression.csproj -c Release --no-build -- http://127.0.0.1:5187

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AgendaiFisio.DTOs.BloqueioAgenda;
 using AgendaiFisio.DTOs.Profissional;
 using AgendaiFisio.Services.Profissional;
 using AgendaiFisio.Services.Auth;
@@ -64,6 +65,35 @@ namespace AgendaiFisio.Controllers
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { erro = ex.Message });
+            }
+        }
+
+        // Períodos em que o fisioterapeuta não pode ser agendado (bloqueios e consultas marcadas),
+        // para o paciente ver dias e horários indisponíveis antes de escolher. Não expõe motivo
+        // nem dados de paciente. Ex.: GET api/profissional/{id}/indisponibilidade?inicio=...&fim=...
+        [HttpGet("{id:guid}/indisponibilidade")]
+        public async Task<IActionResult> ListarIndisponibilidade(
+            Guid id,
+            [FromQuery] BloqueioAgendaFiltroDTO filtro)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var periodos = await _profissionalService.ListarIndisponibilidadeAsync(
+                    id,
+                    filtro.Inicio!.Value.UtcDateTime,
+                    filtro.Fim!.Value.UtcDateTime);
+                return Ok(periodos);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { erro = ex.Message });
             }
         }
 

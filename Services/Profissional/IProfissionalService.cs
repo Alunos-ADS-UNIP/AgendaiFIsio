@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AgendaiFisio.DTOs;
 using AgendaiFisio.DTOs.Profissional;
@@ -12,6 +13,13 @@ namespace AgendaiFisio.Services.Profissional
 
         // Devolve os dados completos de um fisioterapeuta pelo id.
         Task<ProfissionalDetailDTO> ObterPorIdAsync(Guid id);
+
+        // Períodos em que o fisioterapeuta não pode ser agendado (bloqueios e consultas marcadas),
+        // dentro de [inicioUtc, fimUtc).
+        Task<IReadOnlyList<IndisponibilidadeDTO>> ListarIndisponibilidadeAsync(
+            Guid profissionalId,
+            DateTime inicioUtc,
+            DateTime fimUtc);
 
         // Devolve o perfil do próprio fisioterapeuta logado, incluindo CPF e data de nascimento.
         Task<ProfissionalMeDTO> ObterMeuPerfilAsync(Guid usuarioId);
