@@ -13,7 +13,5 @@ namespace AgendaiFisio.Services.Especialidade
         // Devolve uma especialidade pelo id, ou null se não existir.
         Task<EspecialidadeResponseDTO?> ObterPorIdAsync(Guid id);
 
-        // Cadastra uma especialidade nova, recusando nomes já existentes.
-        Task<EspecialidadeResponseDTO> CriarAsync(EspecialidadeCreateDTO dto);
     }
 }

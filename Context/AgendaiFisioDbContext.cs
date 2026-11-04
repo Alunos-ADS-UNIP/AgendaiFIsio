@@ -65,9 +65,9 @@ namespace AgendaiFisio.Context
                 .IsUnique()
                 .HasFilter("\"Crefito\" <> ''");
 
-            // Impede duas especialidades com o mesmo nome. A collation ICU faz
-            // a comparação (e o índice único) ignorar maiúsculas/minúsculas e acentos; o trim e o
-            // colapso de espaços internos ficam a cargo do EspecialidadeNomeNormalizador.
+            // Impede duas especialidades com o mesmo nome. A collation ICU faz a comparação e o
+            // índice único ignorarem maiúsculas/minúsculas e acentos. No MVP, os nomes vêm
+            // exclusivamente do catálogo versionado no seed.
             modelBuilder.Entity<Especialidade>(e =>
             {
                 e.Property(x => x.Nome)

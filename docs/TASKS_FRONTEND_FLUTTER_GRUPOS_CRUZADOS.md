@@ -29,7 +29,7 @@ Todas as tasks devem seguir o [Design System Flutter](./DESIGN_SYSTEM_FLUTTER.md
 - Adicionar `Authorization: Bearer <token>` automaticamente nas chamadas protegidas.
 - Não adicionar o header em login, cadastro ou leitura do OpenAPI.
 - Limpar a sessão em logout e em respostas `401`.
-- Criar guardas de navegação para `Paciente`, `Profissional` e `Clinica`.
+- Criar guardas de navegação para `Paciente` e `Profissional`.
 - Não registrar JWT, senha ou CPF nos logs.
 
 **Critérios de aceite:**
@@ -37,7 +37,7 @@ Todas as tasks devem seguir o [Design System Flutter](./DESIGN_SYSTEM_FLUTTER.md
 - Após o login, uma chamada a `/api/auth/me` funciona sem copiar o JWT manualmente.
 - Reiniciar o aplicativo restaura uma sessão ainda válida.
 - `401` leva à tela de login e limpa os dados locais.
-- Uma função de Clínica não aparece nem fica acessível para Paciente ou Profissional.
+- Um usuário não acessa funções reservadas ao outro papel.
 
 ---
 
@@ -70,7 +70,7 @@ Todas as tasks devem seguir o [Design System Flutter](./DESIGN_SYSTEM_FLUTTER.md
 - Paciente cadastrado consegue entrar, consultar e atualizar o próprio perfil.
 - O aplicativo não envia `pacienteId` em nenhuma chamada de perfil próprio.
 - Campos opcionais omitidos não apagam valores existentes.
-- Profissional e Clínica não acessam essa tela.
+- Profissional não acessa essa tela.
 
 ### A-FE-02 - Agenda do paciente e novo agendamento
 
@@ -129,36 +129,19 @@ Todas as tasks devem seguir o [Design System Flutter](./DESIGN_SYSTEM_FLUTTER.md
 - A ordenação permanece da consulta mais recente para a mais antiga.
 - A tela não duplica itens ao carregar páginas adicionais.
 
-### A-FE-04 - Clínica agenda para um paciente
-
-**Responsável:** Caio.
-
-**Prioridade:** baixa para a apresentação; fluxo administrativo separado.
-
-**Rota disponível:**
-
-- `POST /api/agendamento/administrativo`
-
-**Implementação Flutter:**
-
-- Criar formulário administrativo que recebe `pacienteId`, `profissionalId`, `dataHora`, `status` e `observacoes`.
-- Exibir a opção somente para `tipoUsuario == "Clinica"`.
-- Não reutilizar esse contrato no fluxo comum do paciente.
-
-**Critérios de aceite:**
-
-- Paciente e Profissional não visualizam nem acessam o fluxo.
-- Clínica recebe mensagens adequadas para paciente/profissional inexistente e conflito de horário.
-
-### A-FE-05 - Gestão administrativa de pacientes
+### A-FE-04 - Busca e detalhe de pacientes para o profissional
 
 **Responsável:** Dudu.
 
-**Status:** bloqueada por backend.
+**Status:** backend disponível.
 
-**Escopo do PDF ainda sem rotas:** listagem paginada de pacientes, busca por nome/documento e detalhe administrativo de um paciente.
+**Rotas disponíveis:**
 
-**Dependência para iniciar integração:** o backend precisa publicar contratos de listagem e detalhe com autorização de Clínica. A UI e os testes de widget podem ser preparados com mocks, mas a task não deve ser considerada concluída sem integração real.
+- `GET /api/paciente?pagina=&tamanhoPagina=&busca=` - somente Profissional
+- `GET /api/paciente/{id}` - somente Profissional
+
+**Implementação Flutter:** criar listagem paginada, busca por nome ou documento e tela de detalhe.
+Não armazenar ou exibir dados de outro paciente fora da área autenticada do profissional.
 
 ### A-FE-06 - Reagendamento, cancelamento e mudança de status
 
@@ -236,22 +219,18 @@ Todas as tasks devem seguir o [Design System Flutter](./DESIGN_SYSTEM_FLUTTER.md
 - `GET /api/especialidade`
 - `GET /api/especialidade/{id}`
 - `PUT /api/profissional/especialidade` - Profissional
-- `POST /api/especialidade` - Clínica
 
 **Implementação Flutter:**
 
 - Criar seletor pesquisável de especialidades no perfil profissional.
 - Persistir a seleção com `{ "especialidadeId": "..." }`.
-- Criar tela simples de cadastro de especialidade exclusiva da Clínica.
-- Atualizar o catálogo local imediatamente após `201`.
-- Tratar `400`, `404` e `409` com mensagens específicas.
+- Tratar `400` e `404` com mensagens específicas.
 
 **Critérios de aceite:**
 
 - Listagem de especialidades funciona mesmo antes do login.
 - Profissional pode escolher ou trocar sua especialidade.
-- Apenas Clínica vê a ação de criar especialidade.
-- Especialidade duplicada não aparece duas vezes na lista.
+- O aplicativo não oferece criação, edição ou exclusão de itens do catálogo no MVP.
 
 ### B-FE-04 - Grade e disponibilidade do fisioterapeuta
 

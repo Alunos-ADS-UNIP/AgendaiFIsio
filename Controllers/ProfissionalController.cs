@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AgendaiFisio.Constants;
 using AgendaiFisio.DTOs.BloqueioAgenda;
 using AgendaiFisio.DTOs.Profissional;
 using AgendaiFisio.Services.Profissional;
@@ -14,7 +15,7 @@ namespace AgendaiFisio.Controllers
     // Recebe solicitações relacionadas à listagem, ao detalhe e à atualização do fisioterapeuta.
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = PerfilDeUsuario.AutenticadosMvp)]
     public class ProfissionalController : ControllerBase
     {
         private readonly IProfissionalService _profissionalService;
@@ -51,7 +52,7 @@ namespace AgendaiFisio.Controllers
         // Retorna o perfil do próprio fisioterapeuta logado, com CPF e data de nascimento.
         // Esses dados não aparecem no detalhe público (GET api/profissional/{id}).
         [HttpGet("me")]
-        [Authorize(Roles = "Profissional")]
+        [Authorize(Roles = PerfilDeUsuario.Profissional)]
         public async Task<IActionResult> ObterMeuPerfil()
         {
             var usuarioAtual = _usuarioAtualService.Obter();

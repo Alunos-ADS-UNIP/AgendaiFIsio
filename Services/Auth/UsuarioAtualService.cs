@@ -34,7 +34,7 @@ public sealed class UsuarioAtualService(IHttpContextAccessor httpContextAccessor
             perfilId = perfilIdConvertido;
         }
 
-        if (tipoUsuario != PerfilDeUsuario.Admin && perfilId is null)
+        if (perfilId is null)
             return null;
 
         return new UsuarioAtual(usuarioId, perfilId, email, tipoUsuario);

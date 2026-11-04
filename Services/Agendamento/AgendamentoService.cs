@@ -82,10 +82,6 @@ public class AgendamentoService : IAgendamentoService
         return await ValidateAndCreateAsync(agendamento);
     }
 
-    // Fluxo separado para a Clínica operar em nome de um paciente explícito.
-    public Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento)
-        => ValidateAndCreateAsync(agendamento);
-
     // Confere as entidades envolvidas e reserva o horário quando ele está disponível.
     private async Task<Entities.Agendamento> ValidateAndCreateAsync(
         Entities.Agendamento agendamento)
@@ -264,7 +260,6 @@ public class AgendamentoService : IAgendamentoService
         {
             PerfilDeUsuario.Paciente => query.Where(a => a.Paciente!.UsuarioId == usuarioId),
             PerfilDeUsuario.Profissional => query.Where(a => a.Profissional!.UsuarioId == usuarioId),
-            PerfilDeUsuario.Admin => query,
             _ => query.Where(_ => false)
         };
     }

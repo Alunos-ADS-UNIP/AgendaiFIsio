@@ -17,8 +17,6 @@ public interface IAgendamentoService
         Entities.Agendamento agendamento,
         Guid pacienteId);
 
-    Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento);
-
     Task<Entities.Agendamento> ReagendarAsync(
         Guid id,
         DateTime novaDataHora,
