@@ -35,11 +35,6 @@ jobs:
       JwtSettings__Issuer: AgendaiFisioCI
       JwtSettings__Audience: AgendaiFisioCIClients
       JwtSettings__ExpirationHours: 1
-      AdminSeed__Email: ci-admin@example.invalid
-      AdminSeed__Senha: Regression123!
-      RegressionAdmin__Email: ci-admin@example.invalid
-      RegressionAdmin__Senha: Regression123!
-
     steps:
       - uses: actions/checkout@v4
 

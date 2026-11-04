@@ -29,10 +29,9 @@ namespace AgendaiFisio.Services.Auth
         // Cadastra o usuário e cria seu perfil inicial.
         public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
         {
-            // Confere e normaliza o tipo de usuário. "Clinica" (admin) nunca passa por aqui — só é
-            // provisionada por um mecanismo confiável (ver Program.cs). O [TipoUsuarioValido] no
-            // DTO já bloqueia isso no model binding; esta linha é a segunda camada, para quando
-            // o serviço é chamado direto sem passar por ele.
+            // Confere e normaliza o tipo de usuário. O MVP aceita somente Paciente e Profissional.
+            // O [TipoUsuarioValido] no DTO já bloqueia outros papéis no model binding; esta linha
+            // é a segunda camada para chamadas diretas ao serviço.
             var tipoUsuario = AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(registroDto.TipoUsuario)
                 ?? throw new ArgumentException("Tipo de usuario invalido. Use Paciente ou Profissional.");
 
@@ -125,7 +124,7 @@ namespace AgendaiFisio.Services.Auth
             }
 
             var tipoUsuario = PerfilDeUsuario.NormalizarAutenticado(usuario.TipoUsuario)
-                ?? throw new InvalidOperationException("O tipo de usuário cadastrado é inválido.");
+                ?? throw new UnauthorizedAccessException("Perfil de usuário não permitido neste aplicativo.");
 
             var perfilId = tipoUsuario switch
             {
@@ -134,7 +133,7 @@ namespace AgendaiFisio.Services.Auth
                 _ => null
             };
 
-            if (tipoUsuario != PerfilDeUsuario.Admin && perfilId is null)
+            if (perfilId is null)
                 throw new InvalidOperationException("O perfil do usuário não foi encontrado.");
 
             // Gera o token depois de validar a conta e localizar seu perfil de domínio.

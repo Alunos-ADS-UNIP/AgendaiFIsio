@@ -17,8 +17,8 @@ confirmação do solicitante, conforme pedido pela Task 1 do documento de revis�
   persistido.
 - Criar uma conta sem escolher especialidade é permitido. O vínculo pode ser preenchido depois,
   a qualquer momento, por `PUT /api/profissional/especialidade`.
-- Somente a Clínica (papel `Clinica`) cadastra especialidades novas, por `POST /api/especialidade`.
-  Um profissional comum não cria itens do catálogo, nem pela interface nem chamando a API direto.
+- O catálogo do MVP é fechado e carregado pela migration. Não existe rota para criar, editar ou
+  excluir especialidades durante a execução da aplicação.
 - A listagem (`GET /api/especialidade`, `GET /api/especialidade/{id}`) é pública (sem login),
   porque a tela de cadastro do profissional precisa dela antes de existir qualquer token. Nenhuma
   outra rota do controller é anônima.
@@ -51,29 +51,12 @@ já devolve). Essa é a lista do produto, não uma validação de títulos ou re
 e não existe mapeamento automático entre nomes antigos de perfis e esses 16 itens (ver seção de
 migração abaixo).
 
-## Comparação de nomes — decisão técnica, pendente de confirmação do solicitante
+## Comparação e busca de nomes
 
-A regra abaixo foi **adotada para a implementação** por ser a única descrita com exemplos
-concretos no documento de revisão. Ela **não foi confirmada pelo solicitante da feature** e deve
-ser revisada por quem decide o produto antes de ser tratada como definitiva:
-
-- Ignorar maiúsculas/minúsculas e acentos.
-- Aparar espaços nas extremidades.
-- Reduzir espaços internos seguidos a um só.
-- A grafia de exibição aprovada (lista acima) é preservada; só a comparação ignora caixa/acento.
-
-**Onde está aplicada, de forma consistente:**
-- Carga inicial do catálogo (nomes exatos da lista, sem variação).
-- Cadastro administrativo (`EspecialidadeService.CriarAsync`, via
-  `EspecialidadeNomeNormalizador.Normalizar` + collation `Latin1_General_CI_AI` na coluna `Nome`).
-- Índice único da coluna `Nome` (mesma collation, então o próprio banco já rejeita duplicata por
-  caixa/acento, não só o código da aplicação).
-- Migração de dados antigos (comparação com `COLLATE Latin1_General_CI_AI` inline, ver abaixo).
-
-**Exemplos de comportamento já implementado:** cadastrar administrativamente `" aquatica "`
-colide com `Aquática` (409); buscar `respiratoria` encontra `Fisioterapia Respiratória` no
-lado do banco (mesma collation), embora a busca em si seja responsabilidade do frontend (Task 5),
-filtrando a lista que `GET /api/especialidade` devolve.
+A API preserva a grafia aprovada do catálogo. Como o catálogo é fechado no MVP, a busca textual é
+responsabilidade do frontend sobre a lista devolvida por `GET /api/especialidade`; ela não cria
+novos registros. A migration continua usando comparação sem diferença de caixa ou acento apenas
+para tentar vincular dados legados aos itens aprovados.
 
 ## Seleção única e vínculo (`EspecialidadeId`)
 
@@ -112,18 +95,14 @@ WHERE EspecialidadeId IS NULL AND LTRIM(RTRIM(Especialidade)) <> '';
 A coluna antiga só deve ser removida numa migration futura, depois que alguém revisar essas
 divergências — não antes.
 
-## Papel administrativo (`Clinica`)
+## Papéis do MVP
 
-O autocadastro público (`POST /api/auth/register`) só aceita `TipoUsuario` igual a `Paciente` ou
-`Profissional`; qualquer outro valor (incluindo `Clinica`) é rejeitado. A primeira conta `Clinica`
-é provisionada pelo backend a partir de configuração (`AdminSeed:Email` / `AdminSeed:Senha`, lidas
-em `Program.cs`), nunca pelo cadastro público. Essas chaves não ficam no `appsettings.json`
-versionado — devem ser definidas por variável de ambiente ou `dotnet user-secrets` no ambiente onde
-a API roda, e removidas/trocadas depois do primeiro uso.
+O autocadastro público (`POST /api/auth/register`) e as rotas autenticadas aceitam somente
+`Paciente` e `Profissional`. Não existe perfil administrativo ou de clínica no MVP.
 
 ## Fora do escopo desta entrega (backend)
 
 - **Task 5 (seletor com busca no frontend):** este repositório contém só a API; não há tela de
   cadastro/edição aqui. Fica pendente até alguém apontar o repositório/responsável do frontend.
-- **DELETE de especialidade:** não implementado de propósito — a FK com `OnDelete(Restrict)` já
-  impede apagar uma especialidade em uso, o que satisfaz a integridade pedida sem precisar da rota.
+- **Alteração do catálogo:** não há POST, PUT, PATCH ou DELETE de especialidade no MVP. Mudanças na
+  lista exigem migration revisada.

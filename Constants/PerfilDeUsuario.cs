@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace AgendaiFisio.Constants
 {
@@ -16,13 +13,10 @@ namespace AgendaiFisio.Constants
         }
 
         public static string? NormalizarAutenticado(string? valor)
-        {
-            if (string.Equals(valor?.Trim(), Admin, StringComparison.OrdinalIgnoreCase)) return Admin;
-            return NormalizarCadastro(valor);
-        }
+            => NormalizarCadastro(valor);
 
-        public const string Admin = "Clinica";
         public const string Paciente = "Paciente";
         public const string Profissional = "Profissional";
+        public const string AutenticadosMvp = Paciente + "," + Profissional;
     }
 }

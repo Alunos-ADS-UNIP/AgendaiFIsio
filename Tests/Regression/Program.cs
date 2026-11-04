@@ -19,10 +19,6 @@ using Microsoft.IdentityModel.Tokens;
 var config = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json").AddJsonFile("appsettings.Development.json")
     .AddEnvironmentVariables().Build();
-var adminEmail = config["RegressionAdmin:Email"]
-    ?? throw new InvalidOperationException("Configure RegressionAdmin__Email para executar os testes administrativos.");
-var adminSenha = config["RegressionAdmin:Senha"]
-    ?? throw new InvalidOperationException("Configure RegressionAdmin__Senha para executar os testes administrativos.");
 await using var db = new AgendaiFisioDbContext(new DbContextOptionsBuilder<AgendaiFisioDbContext>()
     .UseNpgsql(AgendaiFisio.Infrastructure.PostgresConnectionString.Resolve(
         config,
@@ -30,7 +26,6 @@ await using var db = new AgendaiFisioDbContext(new DbContextOptionsBuilder<Agend
 using var http = new HttpClient { BaseAddress = new Uri(args.FirstOrDefault() ?? "http://localhost:5187") };
 var prefix = "regression-" + Guid.NewGuid().ToString("N");
 var emails = new[] { prefix + "-pac@example.invalid", prefix + "-prof@example.invalid", prefix + "-pac2@example.invalid", prefix + "-prof2@example.invalid" };
-Guid? especialidadeCriadaId = null;
 var checks = 0;
 void Check(bool condition, string name)
 {
@@ -84,9 +79,30 @@ string CreateExpiredToken()
     return new JwtSecurityTokenHandler().WriteToken(
         new JwtSecurityTokenHandler().CreateToken(descriptor));
 }
+string CreateLegacyAdminToken()
+{
+    var jwtSettings = config.GetSection("JwtSettings");
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+        jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JwtSettings:SecretKey ausente.")));
+    var descriptor = new SecurityTokenDescriptor
+    {
+        Subject = new ClaimsIdentity(new[]
+        {
+            new Claim(JwtClaimNames.Subject, Guid.NewGuid().ToString()),
+            new Claim(JwtClaimNames.Email, "legacy-admin@example.invalid"),
+            new Claim(JwtClaimNames.Role, "Clinica")
+        }),
+        Expires = DateTime.UtcNow.AddHours(1),
+        Issuer = jwtSettings["Issuer"],
+        Audience = jwtSettings["Audience"],
+        SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
+    };
+    return new JwtSecurityTokenHandler().WriteToken(
+        new JwtSecurityTokenHandler().CreateToken(descriptor));
+}
 object Patient(string cpf, bool address, string? nome = null) => address
-    ? new { nomeCompleto = nome ?? prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "10", cep = "01001000", complemento = "Sala 1", bairro = "Centro", cidade = "Sao Paulo", estado = "SP" }
-    : new { nomeCompleto = nome ?? prefix, cpf, dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "11", cep = "01001000" };
+    ? new { nomeCompleto = nome ?? prefix, cpf, telefone = "11988887777", dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "10", cep = "01001000", complemento = "Sala 1", bairro = "Centro", cidade = "Sao Paulo", estado = "SP" }
+    : new { nomeCompleto = nome ?? prefix, cpf, telefone = "11988887777", dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "11", cep = "01001000" };
 object Professional(string cpf, string? nome = null) => new { nomeCompleto = nome ?? prefix, cpf, crefito = "T" + Guid.NewGuid().ToString("N")[..12], telefone = "11999999999", dataNascimento = "1990-01-01", bio = "Teste automatizado", ativo = true };
 Check(await db.Database.CanConnectAsync(), "Banco conectado");
 Check(!(await db.Database.GetPendingMigrationsAsync()).Any(), "Banco sem migracoes pendentes");
@@ -118,6 +134,9 @@ try
         openApi.GetRawText().Contains("2026-11-03T09:00:00-03:00", StringComparison.Ordinal),
         "OpenAPI documenta o contrato de hora cheia com exemplo");
     await Request(HttpMethod.Get, "/api/profissional", null, HttpStatusCode.Unauthorized, "Listagem exige autenticacao");
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new { email = prefix + "-senha-curta@example.invalid", senha = "1234567", tipoUsuario = "Paciente" },
+        HttpStatusCode.BadRequest, "Cadastro rejeita senha com menos de oito caracteres");
     foreach (var role in new[] { "Admin", "Clinica", "Desconhecido", "" })
         await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[2], senha = "Regression123!", tipoUsuario = role }, HttpStatusCode.BadRequest, "Cadastro rejeita papel " + role);
     for (var i = 0; i < 2; i++)
@@ -147,10 +166,7 @@ try
     var professionalToken = await Login(1);
     var segundoPacienteToken = await Login(2);
     var segundoProfissionalToken = await Login(3);
-    var adminLogin = await Request(HttpMethod.Post, "/api/auth/login", new { email = adminEmail, senha = adminSenha }, HttpStatusCode.OK, "Login da Clinica");
-    var adminToken = adminLogin.GetProperty("accessToken").GetString()!;
-    Check(adminLogin.GetProperty("usuario").GetProperty("perfilId").ValueKind == JsonValueKind.Null,
-        "Clinica nao recebe perfil de paciente ou profissional");
+    var legacyAdminToken = CreateLegacyAdminToken();
     var pacienteMeAuth = await Request(HttpMethod.Get, "/api/auth/me", null, HttpStatusCode.OK,
         "Auth me devolve identidade autenticada", patientToken);
     Check(pacienteMeAuth.GetProperty("email").GetString() == emails[0] &&
@@ -162,21 +178,18 @@ try
         "Token invalido e rejeitado", "token.invalido.assinatura");
     await Request(HttpMethod.Get, "/api/auth/me", null, HttpStatusCode.Unauthorized,
         "Token expirado e rejeitado", CreateExpiredToken());
+    await Request(HttpMethod.Get, "/api/auth/me", null, HttpStatusCode.Forbidden,
+        "Token legado de Clinica nao acessa o MVP", legacyAdminToken);
+    await Request(HttpMethod.Get, "/api/profissional", null, HttpStatusCode.Forbidden,
+        "Token legado de Clinica nao acessa rotas genericas", legacyAdminToken);
     await Request(HttpMethod.Post, "/api/auth/logout", null, HttpStatusCode.Unauthorized,
         "Logout exige login");
     var especialidades = await Request(HttpMethod.Get, "/api/especialidade", null, HttpStatusCode.OK, "Catalogo de especialidades publico");
     var especialidadeId = especialidades.EnumerateArray().First().GetProperty("id").GetGuid();
     await Request(HttpMethod.Get, "/api/especialidade/" + especialidadeId, null, HttpStatusCode.OK, "Consulta publica de especialidade");
     await Request(HttpMethod.Get, "/api/especialidade/" + Guid.NewGuid(), null, HttpStatusCode.NotFound, "Especialidade inexistente");
-    await Request(HttpMethod.Post, "/api/especialidade", new { nome = "Especialidade sem autenticacao" }, HttpStatusCode.Unauthorized, "Cadastro de especialidade exige autenticacao");
-    await Request(HttpMethod.Post, "/api/especialidade", new { nome = "Especialidade por profissional" }, HttpStatusCode.Forbidden, "Profissional nao cadastra especialidade", professionalToken);
-    await Request(HttpMethod.Post, "/api/especialidade", new { nome = "Especialidade por paciente" }, HttpStatusCode.Forbidden, "Paciente nao acessa funcao da Clinica", patientToken);
-    await Request(HttpMethod.Post, "/api/especialidade", new { nome = " x " }, HttpStatusCode.BadRequest, "Clinica nao cadastra nome curto", adminToken);
-    var nomeEspecialidadeCriada = "Regressao " + prefix;
-    var especialidadeCriada = await Request(HttpMethod.Post, "/api/especialidade", new { nome = "  " + nomeEspecialidadeCriada + "  " }, HttpStatusCode.Created, "Clinica cadastra especialidade", adminToken);
-    especialidadeCriadaId = especialidadeCriada.GetProperty("id").GetGuid();
-    Check(especialidadeCriada.GetProperty("nome").GetString() == nomeEspecialidadeCriada, "Nome da especialidade normalizado");
-    await Request(HttpMethod.Post, "/api/especialidade", new { nome = nomeEspecialidadeCriada.ToUpperInvariant() }, HttpStatusCode.Conflict, "Catalogo rejeita especialidade duplicada", adminToken);
+    await Request(HttpMethod.Post, "/api/especialidade", new { nome = "Especialidade fora do MVP" },
+        HttpStatusCode.MethodNotAllowed, "MVP nao expoe cadastro de especialidade");
     await Request(HttpMethod.Post, "/api/auth/login", new { email = emails[0], senha = "errada" }, HttpStatusCode.Unauthorized, "Senha incorreta rejeitada");
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("11111111111", true), HttpStatusCode.BadRequest, "Rota paciente rejeita CPF invalido", patientToken);
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("11111111111"), HttpStatusCode.BadRequest, "Rota profissional rejeita CPF invalido", professionalToken);
@@ -205,8 +218,6 @@ try
         "Listagem de pacientes exige login");
     await Request(HttpMethod.Get, "/api/paciente", null, HttpStatusCode.Forbidden,
         "Paciente nao lista pacientes", patientToken);
-    await Request(HttpMethod.Get, "/api/paciente", null, HttpStatusCode.Forbidden,
-        "Clinica nao lista pacientes", adminToken);
     var buscaPacientes = await Request(HttpMethod.Get,
         "/api/paciente?busca=" + Uri.EscapeDataString(prefix) + "&pagina=1&tamanhoPagina=1",
         null, HttpStatusCode.OK, "Profissional pesquisa pacientes com paginacao", professionalToken);
@@ -245,8 +256,6 @@ try
         "Detalhe do paciente exige login");
     await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null, HttpStatusCode.Forbidden,
         "Paciente nao consulta cadastro de paciente por id", patientToken);
-    await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null, HttpStatusCode.Forbidden,
-        "Clinica nao consulta cadastro completo do paciente", adminToken);
     var detalhePaciente = await Request(HttpMethod.Get, "/api/paciente/" + patient.Id, null,
         HttpStatusCode.OK, "Profissional consulta cadastro completo do paciente", professionalToken);
     Check(detalhePaciente.GetProperty("id").GetGuid() == patient.Id &&
@@ -278,7 +287,6 @@ try
     var rotaHistorico = "/api/paciente/" + patient.Id + "/historico-consultas";
     const string rotaMeuHistorico = "/api/paciente/me/historico-consultas";
     await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Unauthorized, "Historico exige login");
-    await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Forbidden, "Clinica nao acessa historico clinico", adminToken);
     var semVinculo = await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.NotFound,
         "Profissional sem agendamento nao acessa historico", professionalToken);
     await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.Forbidden,
@@ -300,9 +308,6 @@ try
     await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
         new { dataHora = horarioBloqueado }, HttpStatusCode.Forbidden,
         "Paciente nao bloqueia agenda", patientToken);
-    await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
-        new { dataHora = horarioBloqueado }, HttpStatusCode.Forbidden,
-        "Clinica nao bloqueia agenda do profissional", adminToken);
     await Request(HttpMethod.Post, "/api/agenda/bloqueios/horarios",
         new { dataHora = horarioBloqueado.AddMinutes(30) }, HttpStatusCode.BadRequest,
         "Bloqueio de horario exige hora cheia", professionalToken);
@@ -446,9 +451,12 @@ try
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario.ToString("yyyy-MM-ddTHH:mm:ss") }, HttpStatusCode.BadRequest, "Agenda rejeita data sem offset", patientToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario.AddMinutes(30) }, HttpStatusCode.BadRequest, "Agenda exige hora cheia", patientToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario }, HttpStatusCode.Forbidden, "Profissional nao cria vinculo arbitrario", professionalToken);
-    await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario }, HttpStatusCode.Forbidden, "Clinica usa somente fluxo administrativo", adminToken);
     await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.NotFound, "Tentativa de vinculo nao libera historico", professionalToken);
-    await Request(HttpMethod.Post, "/api/agendamento/administrativo", new { pacienteId = Guid.NewGuid(), profissionalId = professional.Id, dataHora = horario }, HttpStatusCode.NotFound, "Clinica recebe 404 para paciente inexistente", adminToken);
+    await Request(HttpMethod.Post, "/api/agendamento/administrativo",
+        new { pacienteId = patient.Id, profissionalId = professional.Id, dataHora = horario },
+        HttpStatusCode.MethodNotAllowed, "MVP nao expoe agendamento administrativo", patientToken);
+    await Request(HttpMethod.Get, "/api/agendamento", null, HttpStatusCode.Forbidden,
+        "Token legado de Clinica nao consulta agendas", legacyAdminToken);
     await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = Guid.NewGuid(), dataHora = horario }, HttpStatusCode.NotFound, "Agenda rejeita profissional inexistente", patientToken);
     var agendamento = await Request(HttpMethod.Post, "/api/agendamento", new { profissionalId = professional.Id, dataHora = horario, observacoes = "Teste de regressao" }, HttpStatusCode.Created, "Paciente cria agendamento sem enviar o proprio id", patientToken);
     var agendamentoId = agendamento.GetProperty("id").GetGuid();
@@ -465,29 +473,29 @@ try
         .Select(a => a.DataHora).SingleAsync();
     Check(dataPersistida == horario, "Banco armazena horario normalizado em UTC");
 
-    var agendamentoDaClinica = await Request(HttpMethod.Post, "/api/agendamento/administrativo",
-        new { pacienteId = segundoPaciente.Id, profissionalId = professional.Id, dataHora = horario.AddHours(2) },
-        HttpStatusCode.Created, "Clinica agenda para outro paciente", adminToken);
-    var agendamentoDaClinicaId = agendamentoDaClinica.GetProperty("id").GetGuid();
+    var agendamentoSegundoPaciente = await Request(HttpMethod.Post, "/api/agendamento",
+        new { profissionalId = professional.Id, dataHora = horario.AddHours(2) },
+        HttpStatusCode.Created, "Segundo paciente agenda a propria consulta", segundoPacienteToken);
+    var agendamentoSegundoPacienteId = agendamentoSegundoPaciente.GetProperty("id").GetGuid();
     var agendaPaciente = await Request(HttpMethod.Get, "/api/agendamento", null, HttpStatusCode.OK,
         "Paciente lista sua agenda", patientToken);
     Check(agendaPaciente.EnumerateArray().Any(a => a.GetProperty("id").GetGuid() == agendamentoId) &&
-        !agendaPaciente.EnumerateArray().Any(a => a.GetProperty("id").GetGuid() == agendamentoDaClinicaId),
+        !agendaPaciente.EnumerateArray().Any(a => a.GetProperty("id").GetGuid() == agendamentoSegundoPacienteId),
         "Agenda do paciente nao inclui outro paciente");
     var agendaSegundoProfissional = await Request(HttpMethod.Get, "/api/agendamento", null, HttpStatusCode.OK,
         "Profissional lista sua agenda", segundoProfissionalToken);
     Check(agendaSegundoProfissional.EnumerateArray().All(a => a.GetProperty("profissionalId").GetGuid() == segundoProfissional.Id),
         "Profissional nao lista agendamentos alheios");
-    await Request(HttpMethod.Get, "/api/agendamento/" + agendamentoDaClinicaId, null,
+    await Request(HttpMethod.Get, "/api/agendamento/" + agendamentoSegundoPacienteId, null,
         HttpStatusCode.NotFound, "Paciente nao consulta agendamento de outro paciente", patientToken);
     await Request(HttpMethod.Get, "/api/agendamento/" + agendamentoId, null,
         HttpStatusCode.NotFound, "Profissional nao consulta agendamento de outro profissional", segundoProfissionalToken);
-    await Request(HttpMethod.Get, "/api/agendamento/" + agendamentoDaClinicaId, null,
-        HttpStatusCode.OK, "Clinica consulta agendamento administrativo", adminToken);
-    var historicoDaClinica = await Request(HttpMethod.Get,
+    await Request(HttpMethod.Get, "/api/agendamento/" + agendamentoSegundoPacienteId, null,
+        HttpStatusCode.OK, "Profissional consulta agendamento atribuido a ele", professionalToken);
+    var historicoSegundoPaciente = await Request(HttpMethod.Get,
         "/api/paciente/" + segundoPaciente.Id + "/historico-consultas", null, HttpStatusCode.OK,
-        "Agendamento da clinica libera historico ao profissional", professionalToken);
-    Check(historicoDaClinica.GetProperty("itens").GetArrayLength() == 0,
+        "Agendamento do paciente libera historico ao profissional", professionalToken);
+    Check(historicoSegundoPaciente.GetProperty("itens").GetArrayLength() == 0,
         "Paciente com apenas agendamento futuro tem historico vazio");
     var historicoAntesDaConsulta = await Request(HttpMethod.Get, rotaHistorico, null, HttpStatusCode.OK,
         "Profissional com agendamento consulta historico", professionalToken);
@@ -658,8 +666,6 @@ finally
     db.Enderecos.RemoveRange(patients.Select(p => p.Endereco));
     db.Pacientes.RemoveRange(patients);
     db.Profissionais.RemoveRange(professionals);
-    if (especialidadeCriadaId.HasValue)
-        db.Especialidades.RemoveRange(await db.Especialidades.Where(e => e.Id == especialidadeCriadaId.Value).ToListAsync());
     db.Usuarios.RemoveRange(await db.Usuarios.Where(u => emails.Contains(u.Email)).ToListAsync());
     await db.SaveChangesAsync();
     Console.WriteLine("Registros desta execucao removidos.");

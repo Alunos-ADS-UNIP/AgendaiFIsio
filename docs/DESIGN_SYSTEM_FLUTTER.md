@@ -119,9 +119,8 @@ Barra inferior com quatro destinos:
 3. **Pacientes** - pacientes vinculados e historico autorizado.
 4. **Perfil** - dados profissionais e especialidade.
 
-### Clinica
-
-O perfil Clinica e administrativo e tem baixa prioridade para a apresentacao. Quando implementado, deve usar navegacao propria, sem exibir funcoes administrativas aos demais perfis.
+O MVP não possui perfil de clínica ou administrador. A navegação deve considerar somente Paciente
+e Fisioterapeuta.
 
 ## 7. Padrao das telas
 

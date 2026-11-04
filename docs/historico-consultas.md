@@ -16,8 +16,8 @@ decrescente.
 
 O próprio paciente pode consultar seu histórico. Um profissional pode consultá-lo se houver um
 agendamento não cancelado entre ambos, inclusive futuro. Paciente inexistente e paciente
-inacessível recebem o mesmo `404`, sem revelar se o identificador existe. A conta `Clinica`
-recebe `403` nesta rota.
+inacessível recebem o mesmo `404`, sem revelar se o identificador existe. O MVP aceita somente
+os papéis `Paciente` e `Profissional` nas rotas autenticadas.
 
 Exemplo de resposta:
 
@@ -41,14 +41,13 @@ Exemplo de resposta:
 
 ## Quem cria e consulta agendamentos
 
-`POST /api/agendamento` aceita somente o próprio paciente ou a clínica. O `pacienteId` do corpo
-continua no contrato para compatibilidade, mas, quando o usuário é paciente, a API consulta o
-perfil pelo JWT e rejeita um identificador diferente. A gravação usa o identificador obtido do
-perfil autenticado. Profissionais não criam agendamentos para estabelecer acesso ao histórico.
+`POST /api/agendamento` aceita somente o próprio paciente. O `pacienteId` do corpo continua no
+contrato para compatibilidade, mas a API consulta o perfil pelo JWT e rejeita um identificador
+diferente. A gravação usa o identificador obtido do perfil autenticado. Profissionais não criam
+agendamentos para estabelecer acesso ao histórico.
 
 `GET /api/agendamento` e `GET /api/agendamento/{id}` retornam somente agendamentos do próprio
-paciente ou do próprio profissional. A clínica mantém acesso administrativo à agenda. Um
-agendamento específico fora desse escopo responde `404`.
+paciente ou do próprio profissional. Um agendamento específico fora desse escopo responde `404`.
 
 ## Datas e status
 

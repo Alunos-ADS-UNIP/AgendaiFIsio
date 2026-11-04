@@ -13,7 +13,7 @@ namespace AgendaiFisio.Controllers
     // Recebe solicitações relacionadas ao perfil do paciente.
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = PerfilDeUsuario.AutenticadosMvp)]
     public class PacienteController : ControllerBase
     {
         private readonly IPacienteService _pacienteService;
