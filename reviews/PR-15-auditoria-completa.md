@@ -237,4 +237,3 @@ O problema é o placeholder: Backend e Mobile estão acoplados a `Cadastro Pende
 5. adicionar testes das rotas novas e das regras acima ao CI;
 6. repetir migrations, 247 regressões e a auditoria complementar sem falhas;
 7. só então atualizar a branch com a `main`, revisar o diff final e fazer o merge.
-

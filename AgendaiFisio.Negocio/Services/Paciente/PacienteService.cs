@@ -1,0 +1,260 @@
+using System;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using AgendaiFisio.DTOs.Paciente;
+using AgendaiFisio.Entities;
+using AgendaiFisio.Constants;
+using AgendaiFisio.DTOs;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using AgendaiFisio.Repositorio.Interfaces;
+
+namespace AgendaiFisio.Services.Paciente
+{
+    // Busca e atualiza os dados dos pacientes.
+    public class PacienteService : IPacienteService
+    {
+        private readonly IPacienteRepositorio _pacientes;
+        private readonly IAgendamentoRepositorio _agendamentos;
+        private readonly IUnidadeDeTrabalho _unidadeDeTrabalho;
+        private readonly ILogger<PacienteService> _logger;
+
+        // Guarda o banco usado pelo serviço.
+        public PacienteService(
+            IPacienteRepositorio pacientes,
+            IAgendamentoRepositorio agendamentos,
+            IUnidadeDeTrabalho unidadeDeTrabalho,
+            ILogger<PacienteService>? logger = null)
+        {
+            _pacientes = pacientes;
+            _agendamentos = agendamentos;
+            _unidadeDeTrabalho = unidadeDeTrabalho;
+            _logger = logger ?? NullLogger<PacienteService>.Instance;
+        }
+
+        // Busca um paciente e seu endereço pelo identificador.
+        public async Task<Entities.Paciente?> GetPacienteByIdAsync(Guid id)
+        {
+            return await _pacientes.Consultar()
+                .Include(p => p.Endereco)
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
+
+        public async Task<PagedResultDTO<PacienteListItemDTO>> ListarAsync(PacienteFiltroDTO filtro)
+        {
+            var query = _pacientes.Consultar().AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(filtro.Busca))
+            {
+                var busca = filtro.Busca.Trim().ToLower();
+                var documento = SomenteDigitos(filtro.Busca);
+
+                query = documento.Length == 0
+                    ? query.Where(p => p.NomeCompleto.ToLower().Contains(busca))
+                    : query.Where(p => p.NomeCompleto.ToLower().Contains(busca) ||
+                        p.Cpf.Replace(".", "").Replace("-", "").Replace(" ", "").Contains(documento));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtro.Nome))
+            {
+                var nome = filtro.Nome.Trim().ToLower();
+                query = query.Where(p => p.NomeCompleto.ToLower().Contains(nome));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtro.Documento))
+            {
+                var documento = SomenteDigitos(filtro.Documento);
+                query = documento.Length == 0
+                    ? query.Where(_ => false)
+                    : query.Where(p => p.Cpf.Replace(".", "").Replace("-", "").Replace(" ", "").Contains(documento));
+            }
+
+            var totalRegistros = await query.CountAsync();
+            var deslocamento = ((long)filtro.Pagina - 1) * filtro.TamanhoPagina;
+
+            var registros = deslocamento >= totalRegistros
+                ? []
+                : await query
+                    .OrderBy(p => p.NomeCompleto)
+                    .ThenBy(p => p.Id)
+                    .Skip((int)deslocamento)
+                    .Take(filtro.TamanhoPagina)
+                    .Select(p => new
+                    {
+                        p.Id,
+                        p.NomeCompleto,
+                        p.Cpf,
+                        p.Telefone,
+                        Email = p.Usuario.Email
+                    })
+                    .ToListAsync();
+
+            return new PagedResultDTO<PacienteListItemDTO>
+            {
+                Itens = registros.Select(p => new PacienteListItemDTO
+                {
+                    Id = p.Id,
+                    NomeCompleto = p.NomeCompleto,
+                    CpfMascarado = MascararCpf(p.Cpf),
+                    Telefone = p.Telefone,
+                    Email = p.Email
+                }).ToList(),
+                TotalRegistros = totalRegistros,
+                PaginaAtual = filtro.Pagina,
+                TamanhoPagina = filtro.TamanhoPagina
+            };
+        }
+
+        public async Task<PacienteMeResponseDTO> ObterPorIdAsync(Guid pacienteId)
+        {
+            var paciente = await ProjetarPerfilCompleto(pacienteId).FirstOrDefaultAsync();
+            return paciente ?? throw new KeyNotFoundException("Paciente não encontrado.");
+        }
+
+        // Projeta apenas o perfil associado ao identificador assinado no JWT.
+        public async Task<PacienteMeResponseDTO?> ObterMeuPerfilAsync(Guid pacienteId)
+        {
+            return await ProjetarPerfilCompleto(pacienteId).FirstOrDefaultAsync();
+        }
+
+        private IQueryable<PacienteMeResponseDTO> ProjetarPerfilCompleto(Guid pacienteId)
+        {
+            return _pacientes.Consultar().AsNoTracking()
+                .Where(p => p.Id == pacienteId)
+                .Select(p => new PacienteMeResponseDTO
+                {
+                    Id = p.Id,
+                    UsuarioId = p.UsuarioId,
+                    Email = p.Usuario.Email,
+                    NomeCompleto = p.NomeCompleto,
+                    Cpf = p.Cpf,
+                    Telefone = p.Telefone,
+                    DataNascimento = p.DataNascimento,
+                    Sexo = p.Sexo,
+                    EstadoCivil = p.EstadoCivil,
+                    Endereco = new EnderecoPacienteDTO
+                    {
+                        Rua = p.Endereco.Rua,
+                        Numero = p.Endereco.Numero,
+                        Complemento = p.Endereco.Complemento,
+                        Cep = p.Endereco.Cep,
+                        Bairro = p.Endereco.Bairro,
+                        Cidade = p.Endereco.Cidade,
+                        Estado = p.Endereco.Estado
+                    }
+                });
+        }
+
+        private static string SomenteDigitos(string valor) =>
+            new(valor.Where(char.IsDigit).ToArray());
+
+        private static string MascararCpf(string cpf)
+        {
+            var digitos = SomenteDigitos(cpf);
+            return digitos.Length == 11 ? $"***.***.***-{digitos[^2..]}" : string.Empty;
+        }
+
+        // Atualiza os dados pessoais e o endereço do paciente.
+        public async Task<bool> UpdatePacienteAsync(Guid usuarioId, PacienteUpdateDTO dto)
+        {
+            // Busca o perfil ligado ao usuário logado.
+            var paciente = await _pacientes.Consultar()
+                .Include(p => p.Endereco)
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
+
+            if (paciente == null)
+                throw new KeyNotFoundException("Perfil de paciente não encontrado para este usuário.");
+
+            paciente.NomeCompleto = dto.NomeCompleto;
+            paciente.Cpf = dto.Cpf;
+            paciente.DataNascimento = dto.DataNascimento;
+            paciente.Telefone = dto.Telefone;
+            paciente.Sexo = dto.Sexo;
+            paciente.EstadoCivil = dto.EstadoCivil;
+
+            if (paciente.Endereco == null)
+            {
+                // Cria um endereço quando o paciente ainda não possui um.
+                paciente.Endereco = new Endereco();
+            }
+
+
+            paciente.Endereco.Rua = dto.Rua;
+            paciente.Endereco.Numero = dto.Numero;
+            paciente.Endereco.Cep = dto.Cep;
+
+
+
+            if (dto.Complemento is not null) paciente.Endereco.Complemento = dto.Complemento.Trim();
+            if (dto.Bairro is not null) paciente.Endereco.Bairro = dto.Bairro.Trim();
+            if (dto.Cidade is not null) paciente.Endereco.Cidade = dto.Cidade.Trim();
+            if (dto.Estado is not null) paciente.Endereco.Estado = dto.Estado.Trim();
+
+            // Salva as alterações feitas no perfil.
+            await _unidadeDeTrabalho.SalvarAsync();
+
+            return true;
+        }
+
+        // Consulta somente agendamentos passados. O status armazenado é exibido sem presumir
+        // que um horário passado foi concluído.
+        public async Task<PagedResultDTO<HistoricoConsultaDTO>> ListarHistoricoConsultasAsync(
+            Guid pacienteId, Guid usuarioId, string tipoUsuario, HistoricoConsultaFiltroDTO filtro)
+        {
+            var podeConsultar = tipoUsuario switch
+            {
+                PerfilDeUsuario.Paciente => await _pacientes.Consultar().AsNoTracking()
+                    .AnyAsync(p => p.Id == pacienteId && p.UsuarioId == usuarioId),
+                PerfilDeUsuario.Profissional => await _agendamentos.Consultar().AsNoTracking()
+                    .AnyAsync(a => a.PacienteId == pacienteId &&
+                        a.Profissional!.UsuarioId == usuarioId && a.Status != "Cancelado"),
+                _ => false
+            };
+
+            if (!podeConsultar)
+            {
+                var pacienteExiste = await _pacientes.Consultar().AsNoTracking()
+                    .AnyAsync(p => p.Id == pacienteId);
+                _logger.LogInformation(
+                    "Histórico não encontrado ou acesso negado. PacienteExiste={PacienteExiste}, TipoUsuario={TipoUsuario}",
+                    pacienteExiste, tipoUsuario);
+                throw new KeyNotFoundException("Histórico de consultas não encontrado.");
+            }
+
+            var agora = DateTime.UtcNow;
+            var consulta = _agendamentos.Consultar().AsNoTracking()
+                .Where(a => a.PacienteId == pacienteId && a.DataHora <= agora);
+            var totalRegistros = await consulta.CountAsync();
+            var deslocamento = ((long)filtro.Pagina - 1) * filtro.TamanhoPagina;
+
+            var itens = deslocamento >= totalRegistros
+                ? new List<HistoricoConsultaDTO>()
+                : await consulta
+                    .OrderByDescending(a => a.DataHora)
+                    .ThenByDescending(a => a.Id)
+                    .Skip((int)deslocamento)
+                    .Take(filtro.TamanhoPagina)
+                    .Select(a => new HistoricoConsultaDTO
+                    {
+                        AgendamentoId = a.Id,
+                        DataHora = a.DataHora,
+                        ProfissionalId = a.ProfissionalId,
+                        ProfissionalNome = a.Profissional!.NomeCompleto,
+                        Status = a.Status
+                    })
+                    .ToListAsync();
+
+            // Mantém o contrato da API explícito: horários históricos são devolvidos em UTC.
+            foreach (var item in itens)
+                item.DataHora = DateTime.SpecifyKind(item.DataHora, DateTimeKind.Utc);
+
+            return new PagedResultDTO<HistoricoConsultaDTO>
+            {
+                Itens = itens,
+                TotalRegistros = totalRegistros,
+                PaginaAtual = filtro.Pagina,
+                TamanhoPagina = filtro.TamanhoPagina
+            };
+        }
+    }
+}

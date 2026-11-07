@@ -10,19 +10,21 @@ using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Validations;
+using AgendaiFisio.Repositorio.Repositorios;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 
 // Executar da raiz do repositório, com a API em Development já iniciada.
-var config = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory())
+var apiDirectory = Path.Combine(Directory.GetCurrentDirectory(), "AgendaiFisio.Api");
+var config = new ConfigurationBuilder().SetBasePath(apiDirectory)
     .AddJsonFile("appsettings.json").AddJsonFile("appsettings.Development.json")
     .AddEnvironmentVariables().Build();
 await using var db = new AgendaiFisioDbContext(new DbContextOptionsBuilder<AgendaiFisioDbContext>()
-    .UseNpgsql(AgendaiFisio.Infrastructure.PostgresConnectionString.Resolve(
-        config,
-        "DATABASE_URL_UNPOOLED")).Options);
+    .UseSqlServer(config.GetConnectionString("Padrao")
+        ?? throw new InvalidOperationException(
+            "Configure ConnectionStrings__Padrao com o SQL Server de testes.")).Options);
 using var http = new HttpClient { BaseAddress = new Uri(args.FirstOrDefault() ?? "http://localhost:5187") };
 var prefix = "regression-" + Guid.NewGuid().ToString("N");
 var emails = new[] { prefix + "-pac@example.invalid", prefix + "-prof@example.invalid", prefix + "-pac2@example.invalid", prefix + "-prof2@example.invalid" };
@@ -112,7 +114,12 @@ try
     foreach (var cpf in new[] { "11111111111", "123", "abcdefghijk", "52998224724" })
         Check(!cpfValidator.IsValid(cpf), "CPF invalido rejeitado: " + cpf);
     Check(cpfValidator.IsValid("52998224725") && cpfValidator.IsValid("529.982.247-25"), "CPF valido com e sem pontuacao");
-    Check(await new PacienteService(db, NullLogger<PacienteService>.Instance).GetPacienteByIdAsync(Guid.NewGuid()) is null, "Paciente inexistente retorna null");
+    Check(await new PacienteService(
+        new PacienteRepositorio(db),
+        new AgendamentoRepositorio(db),
+        new UnidadeDeTrabalho(db),
+        NullLogger<PacienteService>.Instance).GetPacienteByIdAsync(Guid.NewGuid()) is null,
+        "Paciente inexistente retorna null");
     var dataUtc = JsonSerializer.Deserialize<AgendamentoCreateDTO>(
         "{\"dataHora\":\"2026-10-04T17:00:00Z\"}", new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     var dataBrasilia = JsonSerializer.Deserialize<AgendamentoCreateDTO>(
@@ -278,6 +285,38 @@ try
     var professional = await db.Profissionais.AsNoTracking().SingleAsync(p => p.Usuario.Email == emails[1]);
     var segundoProfissional = await db.Profissionais.AsNoTracking().SingleAsync(p => p.Usuario.Email == emails[3]);
     Check(professional.EspecialidadeId == especialidadeId, "Vinculo com especialidade persistido");
+
+    await Request(HttpMethod.Get, "/api/profissional/me", null, HttpStatusCode.Unauthorized,
+        "Perfil proprio do profissional exige login");
+    await Request(HttpMethod.Get, "/api/profissional/me", null, HttpStatusCode.Forbidden,
+        "Paciente nao acessa perfil privado do profissional", patientToken);
+    var profissionalMe = await Request(HttpMethod.Get, "/api/profissional/me", null, HttpStatusCode.OK,
+        "Profissional consulta o proprio perfil", professionalToken);
+    Check(profissionalMe.GetProperty("id").GetGuid() == professional.Id &&
+        profissionalMe.GetProperty("email").GetString() == emails[1] &&
+        profissionalMe.GetProperty("cpf").GetString() == "52998224725" &&
+        profissionalMe.GetProperty("dataNascimento").ValueKind == JsonValueKind.String,
+        "Perfil proprio devolve os dados privados do usuario correto");
+
+    var inicioIndisponibilidade = DateTime.UtcNow.Date.AddDays(5);
+    var fimIndisponibilidade = inicioIndisponibilidade.AddDays(1);
+    var rotaIndisponibilidade = "/api/profissional/" + professional.Id + "/indisponibilidade";
+    await Request(HttpMethod.Get, rotaIndisponibilidade, null, HttpStatusCode.BadRequest,
+        "Indisponibilidade exige periodo", patientToken);
+    await Request(HttpMethod.Get,
+        rotaIndisponibilidade + "?inicio=" + Uri.EscapeDataString(inicioIndisponibilidade.ToString("O")) +
+        "&fim=" + Uri.EscapeDataString(inicioIndisponibilidade.AddDays(94).ToString("O")),
+        null, HttpStatusCode.BadRequest, "Indisponibilidade limita a janela a 93 dias", patientToken);
+    await Request(HttpMethod.Get,
+        "/api/profissional/" + Guid.NewGuid() + "/indisponibilidade?inicio=" +
+        Uri.EscapeDataString(inicioIndisponibilidade.ToString("O")) + "&fim=" +
+        Uri.EscapeDataString(fimIndisponibilidade.ToString("O")),
+        null, HttpStatusCode.NotFound, "Indisponibilidade rejeita profissional inexistente", patientToken);
+    await Request(HttpMethod.Get,
+        rotaIndisponibilidade + "?inicio=" + Uri.EscapeDataString(inicioIndisponibilidade.ToString("O")) +
+        "&fim=" + Uri.EscapeDataString(fimIndisponibilidade.ToString("O")),
+        null, HttpStatusCode.OK, "Paciente consulta indisponibilidade do profissional", patientToken);
+
     var detail = await Request(HttpMethod.Get, "/api/profissional/" + professional.Id, null, HttpStatusCode.OK, "Detalhe profissional", patientToken);
     Check(!detail.TryGetProperty("cpf", out _) && !detail.TryGetProperty("dataNascimento", out _), "Resposta nao expoe CPF nem nascimento");
     Check(detail.GetProperty("especialidade").GetProperty("id").GetGuid() == especialidadeId, "Detalhe devolve especialidade escolhida");
@@ -504,19 +543,25 @@ try
 
     var consultaAntiga = new AgendaiFisio.Entities.Agendamento
     {
-        PacienteId = patient.Id, ProfissionalId = professional.Id,
-        DataHora = DateTime.UtcNow.AddDays(-3), Status = "Concluido"
+        PacienteId = patient.Id,
+        ProfissionalId = professional.Id,
+        DataHora = DateTime.UtcNow.AddDays(-3),
+        Status = "Concluido"
     };
     var consultaRecente = new AgendaiFisio.Entities.Agendamento
     {
-        PacienteId = patient.Id, ProfissionalId = segundoProfissional.Id,
-        DataHora = DateTime.UtcNow.AddDays(-1), Status = "Cancelado"
+        PacienteId = patient.Id,
+        ProfissionalId = segundoProfissional.Id,
+        DataHora = DateTime.UtcNow.AddDays(-1),
+        Status = "Cancelado"
     };
     var consultasAdicionais = Enumerable.Range(0, 53)
         .Select(i => new AgendaiFisio.Entities.Agendamento
         {
-            PacienteId = patient.Id, ProfissionalId = professional.Id,
-            DataHora = DateTime.UtcNow.AddDays(-4 - i), Status = "Concluido"
+            PacienteId = patient.Id,
+            ProfissionalId = professional.Id,
+            DataHora = DateTime.UtcNow.AddDays(-4 - i),
+            Status = "Concluido"
         }).ToList();
     db.Agendamentos.AddRange(consultasAdicionais);
     db.Agendamentos.AddRange(consultaAntiga, consultaRecente);
