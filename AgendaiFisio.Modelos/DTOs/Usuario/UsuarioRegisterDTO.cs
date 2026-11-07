@@ -14,7 +14,7 @@ namespace AgendaiFisio.DTOs.Usuario
         public string Email { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "A senha é obrigatória.")]
-        [MinLength(6, ErrorMessage = "A senha deve ter no mínimo 6 caracteres.")]
+        [MinLength(8, ErrorMessage = "A senha deve ter no mínimo 8 caracteres.")]
         public string Senha { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "O tipo de usuário é obrigatório (ex: Paciente, Profissional).")]

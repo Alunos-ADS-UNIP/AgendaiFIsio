@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AgendaiFisio.Constants;
+using AgendaiFisio.DTOs.BloqueioAgenda;
 using AgendaiFisio.DTOs.Profissional;
 using AgendaiFisio.Services.Profissional;
 using AgendaiFisio.Services.Auth;
@@ -13,7 +15,7 @@ namespace AgendaiFisio.Controllers
     // Recebe solicitações relacionadas à listagem, ao detalhe e à atualização do fisioterapeuta.
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = PerfilDeUsuario.AutenticadosMvp)]
     public class ProfissionalController : ControllerBase
     {
         private readonly IProfissionalService _profissionalService;
@@ -42,6 +44,55 @@ namespace AgendaiFisio.Controllers
                 return Ok(resultado);
             }
             catch (Exception ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
+        }
+
+        // Retorna o perfil do próprio fisioterapeuta logado, com CPF e data de nascimento.
+        // Esses dados não aparecem no detalhe público (GET api/profissional/{id}).
+        [HttpGet("me")]
+        [Authorize(Roles = PerfilDeUsuario.Profissional)]
+        public async Task<IActionResult> ObterMeuPerfil()
+        {
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                return Ok(await _profissionalService.ObterMeuPerfilAsync(usuarioAtual.UsuarioId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+        }
+
+        // Períodos em que o fisioterapeuta não pode ser agendado (bloqueios e consultas marcadas),
+        // para o paciente ver dias e horários indisponíveis antes de escolher. Não expõe motivo
+        // nem dados de paciente. Ex.: GET api/profissional/{id}/indisponibilidade?inicio=...&fim=...
+        [HttpGet("{id:guid}/indisponibilidade")]
+        public async Task<IActionResult> ListarIndisponibilidade(
+            Guid id,
+            [FromQuery] BloqueioAgendaFiltroDTO filtro)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var periodos = await _profissionalService.ListarIndisponibilidadeAsync(
+                    id,
+                    filtro.Inicio!.Value.UtcDateTime,
+                    filtro.Fim!.Value.UtcDateTime);
+                return Ok(periodos);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (ArgumentException ex)
             {
                 return BadRequest(new { erro = ex.Message });
             }

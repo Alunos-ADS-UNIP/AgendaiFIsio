@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using AgendaiFisio.Constants;
 using AgendaiFisio.Services.Auth;
 using AgendaiFisio.DTOs.Usuario;
 
@@ -66,7 +67,7 @@ namespace AgendaiFisio.Controllers
         }
 
         // Devolve a identidade assinada no JWT da requisição atual.
-        [Authorize]
+        [Authorize(Roles = PerfilDeUsuario.AutenticadosMvp)]
         [HttpGet("me")]
         public ActionResult<UsuarioAutenticadoDTO> Me()
         {
@@ -84,7 +85,7 @@ namespace AgendaiFisio.Controllers
         }
 
         // O JWT é stateless; esta rota encerra a sessão no cliente, que descarta o token.
-        [Authorize]
+        [Authorize(Roles = PerfilDeUsuario.AutenticadosMvp)]
         [HttpPost("logout")]
         public IActionResult Logout() => NoContent();
 

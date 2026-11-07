@@ -21,12 +21,10 @@ JwtSettings__SecretKey=<chave forte com pelo menos 32 caracteres>
 JwtSettings__Issuer=AgendaiFisioAPI
 JwtSettings__Audience=AgendaiFisioClients
 JwtSettings__ExpirationHours=8
-AdminSeed__Email=<email inicial da clínica>
-AdminSeed__Senha=<senha inicial da clínica>
 ```
 
-Reinicie o website depois de alterar variáveis. A API aplica migrations pendentes ao iniciar e cria
-a conta Clínica somente quando `AdminSeed` estiver configurado.
+Reinicie o website depois de alterar variáveis. A API aplica migrations pendentes ao iniciar. No
+MVP, as contas são criadas somente pelo cadastro público como `Paciente` ou `Profissional`.
 
 ## Git deploy
 

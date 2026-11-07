@@ -5,7 +5,6 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using AgendaiFisio.Constants;
 using AgendaiFisio.Context;
-using AgendaiFisio.Entities;
 using AgendaiFisio.Services.Auth;
 using AgendaiFisio.Services.Especialidade;
 using AgendaiFisio.Services.Paciente;
@@ -119,13 +118,6 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
 // o EF apenas consulta o histórico e segue sem alterações.
 await ApplyDatabaseMigrationsAsync(connectionString);
 
-// Provisiona a primeira conta Clínica (admin) a partir da configuração, nunca pelo cadastro
-// público — é o "mecanismo confiável" exigido pela revisão (achado 2). Sem AdminSeed:Email e
-// AdminSeed:Senha configurados (ex.: variáveis de ambiente ou user-secrets, nunca no appsettings
-// versionado), este passo não faz nada. Depois do primeiro login, troque a senha e remova a
-// configuração.
-await SeedContaClinicaInicialAsync(app);
-
 app.Run();
 
 static async Task ApplyDatabaseMigrationsAsync(string connectionString)
@@ -136,38 +128,4 @@ static async Task ApplyDatabaseMigrationsAsync(string connectionString)
 
     await using var db = new AgendaiFisioDbContext(options);
     await db.Database.MigrateAsync();
-}
-
-static async Task SeedContaClinicaInicialAsync(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var configuracao = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-
-    var email = configuracao["AdminSeed:Email"];
-    var senha = configuracao["AdminSeed:Senha"];
-
-    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
-    {
-        return;
-    }
-
-    var usuarios = scope.ServiceProvider.GetRequiredService<IUsuarioRepositorio>();
-    var unidadeDeTrabalho = scope.ServiceProvider.GetRequiredService<IUnidadeDeTrabalho>();
-    var emailNormalizado = email.Trim().ToLower();
-
-    var jaExiste = await usuarios.Consultar().AnyAsync(u => u.Email == emailNormalizado);
-
-    if (jaExiste)
-    {
-        return;
-    }
-
-    usuarios.Adicionar(new Usuario
-    {
-        Email = emailNormalizado,
-        SenhaHash = BCrypt.Net.BCrypt.HashPassword(senha),
-        TipoUsuario = PerfilDeUsuario.Admin
-    });
-
-    await unidadeDeTrabalho.SalvarAsync();
 }

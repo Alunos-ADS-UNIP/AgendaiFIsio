@@ -4,13 +4,14 @@ using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Agendamento;
 using AgendaiFisio.Services.Auth;
 using AgendaiFisio.Constants;
+using AgendaiFisio.Validations;
 
 namespace AgendaiFisio.Controllers
 {
     // Recebe solicitações relacionadas à agenda dos profissionais.
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = PerfilDeUsuario.AutenticadosMvp)]
     public class AgendamentoController : ControllerBase
     {
         private readonly IAgendamentoService _agendamentoService;
@@ -90,46 +91,9 @@ namespace AgendaiFisio.Controllers
                     new { id = criado.Id },
                     ToResponse(criado));
             }
-            catch (KeyNotFoundException ex)
+            catch (CadastroIncompletoException ex)
             {
-                return NotFound(new { erro = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Conflict(new { erro = ex.Message });
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(new { erro = ex.Message });
-            }
-        }
-
-        // Permite à Clínica agendar em nome de um paciente explicitamente informado.
-        [HttpPost("administrativo")]
-        [Authorize(Roles = PerfilDeUsuario.Admin)]
-        public async Task<ActionResult<AgendamentoResponseDTO>> CreateForAdminAsync(
-            [FromBody] AgendamentoAdminCreateDTO dto)
-        {
-            if (_usuarioAtualService.Obter() is null)
-                return Unauthorized(new { erro = "Usuário não identificado no token." });
-
-            try
-            {
-                var agendamento = new Entities.Agendamento
-                {
-                    PacienteId = dto.PacienteId,
-                    ProfissionalId = dto.ProfissionalId,
-                    DataHora = dto.DataHora,
-                    Status = dto.Status?.Trim() ?? string.Empty,
-                    Observacoes = dto.Observacoes
-                };
-
-                var criado = await _agendamentoService.CreateForAdminAsync(agendamento);
-
-                return CreatedAtRoute(
-                    "ObterAgendamentoPorId",
-                    new { id = criado.Id },
-                    ToResponse(criado));
+                return UnprocessableEntity(new { erro = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {

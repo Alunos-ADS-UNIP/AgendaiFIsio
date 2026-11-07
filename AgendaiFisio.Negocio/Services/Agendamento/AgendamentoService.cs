@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using AgendaiFisio.Constants;
 using AgendaiFisio.Repositorio;
 using AgendaiFisio.Repositorio.Interfaces;
+using AgendaiFisio.Validations;
 
 namespace AgendaiFisio.Services.Agendamento;
 
@@ -73,17 +74,25 @@ public class AgendamentoService : IAgendamentoService
     }
 
     // Cria um agendamento usando exclusivamente o perfil assinado no token do paciente.
-    public Task<Entities.Agendamento> CreateForPatientAsync(
+    public async Task<Entities.Agendamento> CreateForPatientAsync(
         Entities.Agendamento agendamento,
         Guid pacienteId)
     {
-        agendamento.PacienteId = pacienteId;
-        return ValidateAndCreateAsync(agendamento);
-    }
+        var paciente = await _pacientes.Consultar()
+            .AsNoTracking()
+            .Include(p => p.Endereco)
+            .FirstOrDefaultAsync(p => p.Id == pacienteId);
 
-    // Fluxo separado para a Clínica operar em nome de um paciente explícito.
-    public Task<Entities.Agendamento> CreateForAdminAsync(Entities.Agendamento agendamento)
-        => ValidateAndCreateAsync(agendamento);
+        if (paciente is null)
+            throw new KeyNotFoundException("Paciente não encontrado.");
+
+        if (!CadastroPacienteCompleto.Verificar(paciente))
+            throw new CadastroIncompletoException(
+                "Complete seu cadastro (nome, CPF, data de nascimento, telefone e endereço) antes de agendar.");
+
+        agendamento.PacienteId = pacienteId;
+        return await ValidateAndCreateAsync(agendamento);
+    }
 
     // Confere as entidades envolvidas e reserva o horário quando ele está disponível.
     private async Task<Entities.Agendamento> ValidateAndCreateAsync(
@@ -263,7 +272,6 @@ public class AgendamentoService : IAgendamentoService
         {
             PerfilDeUsuario.Paciente => query.Where(a => a.Paciente!.UsuarioId == usuarioId),
             PerfilDeUsuario.Profissional => query.Where(a => a.Profissional!.UsuarioId == usuarioId),
-            PerfilDeUsuario.Admin => query,
             _ => query.Where(_ => false)
         };
     }

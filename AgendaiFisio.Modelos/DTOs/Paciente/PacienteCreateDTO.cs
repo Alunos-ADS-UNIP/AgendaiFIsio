@@ -28,7 +28,7 @@ namespace AgendaiFisio.DTOs.Paciente
         public string? Telefone { get; set; }
 
         [Required(ErrorMessage = "A senha é obrigatória.")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "A senha deve ter entre 6 e 100 caracteres.")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "A senha deve ter entre 8 e 100 caracteres.")]
         public required string Senha { get; set; }
     }
 }
