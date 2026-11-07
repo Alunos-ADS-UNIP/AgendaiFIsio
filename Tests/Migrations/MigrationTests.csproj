@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../AgendaiFisio.csproj" />
+    <ProjectReference Include="../../AgendaiFisio.Modelos/AgendaiFisio.Modelos.csproj" />
+    <ProjectReference Include="../../AgendaiFisio.Repositorio/AgendaiFisio.Repositorio.csproj" />
   </ItemGroup>
 </Project>

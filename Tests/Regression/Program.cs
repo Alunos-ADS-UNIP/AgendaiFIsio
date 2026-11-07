@@ -10,13 +10,15 @@ using AgendaiFisio.Context;
 using AgendaiFisio.DTOs.Agendamento;
 using AgendaiFisio.Services.Paciente;
 using AgendaiFisio.Validations;
+using AgendaiFisio.Repositorio.Repositorios;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 
 // Executar da raiz do repositório, com a API em Development já iniciada.
-var config = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory())
+var apiDirectory = Path.Combine(Directory.GetCurrentDirectory(), "AgendaiFisio.Api");
+var config = new ConfigurationBuilder().SetBasePath(apiDirectory)
     .AddJsonFile("appsettings.json").AddJsonFile("appsettings.Development.json")
     .AddEnvironmentVariables().Build();
 var adminEmail = config["RegressionAdmin:Email"]
@@ -24,9 +26,9 @@ var adminEmail = config["RegressionAdmin:Email"]
 var adminSenha = config["RegressionAdmin:Senha"]
     ?? throw new InvalidOperationException("Configure RegressionAdmin__Senha para executar os testes administrativos.");
 await using var db = new AgendaiFisioDbContext(new DbContextOptionsBuilder<AgendaiFisioDbContext>()
-    .UseNpgsql(AgendaiFisio.Infrastructure.PostgresConnectionString.Resolve(
-        config,
-        "DATABASE_URL_UNPOOLED")).Options);
+    .UseSqlServer(config.GetConnectionString("Padrao")
+        ?? throw new InvalidOperationException(
+            "Configure ConnectionStrings__Padrao com o SQL Server de testes.")).Options);
 using var http = new HttpClient { BaseAddress = new Uri(args.FirstOrDefault() ?? "http://localhost:5187") };
 var prefix = "regression-" + Guid.NewGuid().ToString("N");
 var emails = new[] { prefix + "-pac@example.invalid", prefix + "-prof@example.invalid", prefix + "-pac2@example.invalid", prefix + "-prof2@example.invalid" };
@@ -96,7 +98,12 @@ try
     foreach (var cpf in new[] { "11111111111", "123", "abcdefghijk", "52998224724" })
         Check(!cpfValidator.IsValid(cpf), "CPF invalido rejeitado: " + cpf);
     Check(cpfValidator.IsValid("52998224725") && cpfValidator.IsValid("529.982.247-25"), "CPF valido com e sem pontuacao");
-    Check(await new PacienteService(db, NullLogger<PacienteService>.Instance).GetPacienteByIdAsync(Guid.NewGuid()) is null, "Paciente inexistente retorna null");
+    Check(await new PacienteService(
+        new PacienteRepositorio(db),
+        new AgendamentoRepositorio(db),
+        new UnidadeDeTrabalho(db),
+        NullLogger<PacienteService>.Instance).GetPacienteByIdAsync(Guid.NewGuid()) is null,
+        "Paciente inexistente retorna null");
     var dataUtc = JsonSerializer.Deserialize<AgendamentoCreateDTO>(
         "{\"dataHora\":\"2026-10-04T17:00:00Z\"}", new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     var dataBrasilia = JsonSerializer.Deserialize<AgendamentoCreateDTO>(
@@ -496,19 +503,25 @@ try
 
     var consultaAntiga = new AgendaiFisio.Entities.Agendamento
     {
-        PacienteId = patient.Id, ProfissionalId = professional.Id,
-        DataHora = DateTime.UtcNow.AddDays(-3), Status = "Concluido"
+        PacienteId = patient.Id,
+        ProfissionalId = professional.Id,
+        DataHora = DateTime.UtcNow.AddDays(-3),
+        Status = "Concluido"
     };
     var consultaRecente = new AgendaiFisio.Entities.Agendamento
     {
-        PacienteId = patient.Id, ProfissionalId = segundoProfissional.Id,
-        DataHora = DateTime.UtcNow.AddDays(-1), Status = "Cancelado"
+        PacienteId = patient.Id,
+        ProfissionalId = segundoProfissional.Id,
+        DataHora = DateTime.UtcNow.AddDays(-1),
+        Status = "Cancelado"
     };
     var consultasAdicionais = Enumerable.Range(0, 53)
         .Select(i => new AgendaiFisio.Entities.Agendamento
         {
-            PacienteId = patient.Id, ProfissionalId = professional.Id,
-            DataHora = DateTime.UtcNow.AddDays(-4 - i), Status = "Concluido"
+            PacienteId = patient.Id,
+            ProfissionalId = professional.Id,
+            DataHora = DateTime.UtcNow.AddDays(-4 - i),
+            Status = "Concluido"
         }).ToList();
     db.Agendamentos.AddRange(consultasAdicionais);
     db.Agendamentos.AddRange(consultaAntiga, consultaRecente);
