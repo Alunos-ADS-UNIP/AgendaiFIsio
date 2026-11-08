@@ -21,6 +21,12 @@ namespace AgendaiFisio.Entities
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; } = true;
 
+        // Local onde o profissional realiza os atendimentos. A FK continua
+        // anulável para que perfis criados antes desta funcionalidade possam
+        // entrar no aplicativo e completar o endereço sem quebrar a migration.
+        public Guid? EnderecoId { get; set; }
+        public virtual Endereco? Endereco { get; set; }
+
         // Vínculo com o catálogo. Fica nulo até o profissional escolher uma opção (no cadastro
         // ou depois, editando o perfil) — ver PUT api/profissional/especialidade.
         public Guid? EspecialidadeId { get; set; }

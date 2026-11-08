@@ -93,6 +93,12 @@ try
         "Migration inicial cria BloqueiosAgenda");
     Check(await ColumnExistsAsync("Profissionais", "FotoPerfilChave"),
         "Migration adiciona a chave privada da foto de perfil");
+    Check(await ColumnExistsAsync("Usuarios", "AceiteLgpd"),
+        "Migration adiciona o aceite LGPD do usuario");
+    Check(await ColumnExistsAsync("Usuarios", "AceiteLgpdEm"),
+        "Migration adiciona a data do aceite LGPD");
+    Check(await ColumnExistsAsync("Profissionais", "EnderecoId"),
+        "Migration adiciona o endereco de atendimento do profissional");
 
     var profissionalId = Guid.NewGuid();
     var horario = DateTime.UtcNow.Date.AddDays(20).AddHours(12);

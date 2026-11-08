@@ -386,6 +386,9 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.Property<DateTime>("DataNascimento")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("EnderecoId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("EspecialidadeId")
                         .HasColumnType("uniqueidentifier");
 
@@ -415,6 +418,10 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                         .IsUnique()
                         .HasFilter("[Crefito] <> ''");
 
+                    b.HasIndex("EnderecoId")
+                        .IsUnique()
+                        .HasFilter("[EnderecoId] IS NOT NULL");
+
                     b.HasIndex("EspecialidadeId");
 
                     b.HasIndex("UsuarioId")
@@ -428,6 +435,12 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AceiteLgpd")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("AceiteLgpdEm")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -530,6 +543,11 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
 
             modelBuilder.Entity("AgendaiFisio.Entities.Profissional", b =>
                 {
+                    b.HasOne("AgendaiFisio.Entities.Endereco", "Endereco")
+                        .WithOne()
+                        .HasForeignKey("AgendaiFisio.Entities.Profissional", "EnderecoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("AgendaiFisio.Entities.Especialidade", "Especialidade")
                         .WithMany()
                         .HasForeignKey("EspecialidadeId")
@@ -540,6 +558,8 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                         .HasForeignKey("AgendaiFisio.Entities.Profissional", "UsuarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Endereco");
 
                     b.Navigation("Especialidade");
 

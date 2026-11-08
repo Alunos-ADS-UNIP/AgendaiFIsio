@@ -40,6 +40,10 @@ namespace AgendaiFisio.Services.Auth
         // Cadastra o usuário e cria seu perfil inicial.
         public async Task<UsuarioResponseDTO> RegistrarAsync(UsuarioRegisterDTO registroDto)
         {
+            if (!registroDto.AceiteLgpd)
+                throw new ArgumentException(
+                    "É necessário aceitar os Termos de Uso e a Política de Privacidade.");
+
             // Confere e normaliza o tipo de usuário. O MVP aceita somente Paciente e Profissional.
             // O [TipoUsuarioValido] no DTO já bloqueia outros papéis no model binding; esta linha
             // é a segunda camada para chamadas diretas ao serviço.
@@ -58,7 +62,9 @@ namespace AgendaiFisio.Services.Auth
             {
                 Email = registroDto.Email.ToLowerInvariant(),
                 SenhaHash = BCrypt.Net.BCrypt.HashPassword(registroDto.Senha),
-                TipoUsuario = tipoUsuario
+                TipoUsuario = tipoUsuario,
+                AceiteLgpd = true,
+                AceiteLgpdEm = DateTime.UtcNow
             };
 
             _usuarios.Adicionar(novoUsuario);
@@ -95,7 +101,8 @@ namespace AgendaiFisio.Services.Auth
                     NomeCompleto = "Cadastro Pendente",
                     Cpf = string.Empty,
                     Crefito = string.Empty,
-                    Telefone = string.Empty
+                    Telefone = string.Empty,
+                    Endereco = new Entities.Endereco()
                 };
                 _profissionais.Adicionar(novoProfissional);
             }

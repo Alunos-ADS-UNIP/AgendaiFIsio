@@ -15,5 +15,6 @@ namespace AgendaiFisio.DTOs.Profissional
         public string Crefito { get; set; } = string.Empty;
         public string? FotoPerfilUrl { get; set; }
         public bool Ativo { get; set; }
+        public EnderecoProfissionalDTO? Endereco { get; set; }
     }
 }

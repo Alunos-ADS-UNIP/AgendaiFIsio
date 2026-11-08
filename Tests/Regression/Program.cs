@@ -123,7 +123,23 @@ string CreateLegacyAdminToken()
 object Patient(string cpf, bool address, string? nome = null) => address
     ? new { nomeCompleto = nome ?? prefix, cpf, telefone = "11988887777", dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "10", cep = "01001000", complemento = "Sala 1", bairro = "Centro", cidade = "Sao Paulo", estado = "SP" }
     : new { nomeCompleto = nome ?? prefix, cpf, telefone = "11988887777", dataNascimento = "1990-01-01", rua = "Rua de teste", numero = "11", cep = "01001000" };
-object Professional(string cpf, string? nome = null) => new { nomeCompleto = nome ?? prefix, cpf, crefito = "T" + Guid.NewGuid().ToString("N")[..12], telefone = "11999999999", dataNascimento = "1990-01-01", bio = "Teste automatizado", ativo = true };
+object Professional(string cpf, string? nome = null) => new
+{
+    nomeCompleto = nome ?? prefix,
+    cpf,
+    crefito = "T" + Guid.NewGuid().ToString("N")[..12],
+    telefone = "11999999999",
+    dataNascimento = "1990-01-01",
+    bio = "Teste automatizado",
+    rua = "Avenida Paulista",
+    numero = "1000",
+    complemento = "Conjunto 10",
+    cep = "01310100",
+    bairro = "Bela Vista",
+    cidade = "Sao Paulo",
+    estado = "SP",
+    ativo = true
+};
 Check(await db.Database.CanConnectAsync(), "Banco conectado");
 Check(!(await db.Database.GetPendingMigrationsAsync()).Any(), "Banco sem migracoes pendentes");
 try
@@ -160,20 +176,32 @@ try
         "OpenAPI documenta o contrato de hora cheia com exemplo");
     await Request(HttpMethod.Get, "/api/profissional", null, HttpStatusCode.Unauthorized, "Listagem exige autenticacao");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = prefix + "-senha-curta@example.invalid", senha = "1234567", tipoUsuario = "Paciente" },
+        new { email = prefix + "-senha-curta@example.invalid", senha = "1234567", tipoUsuario = "Paciente", aceiteLgpd = true },
         HttpStatusCode.BadRequest, "Cadastro rejeita senha com menos de oito caracteres");
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new { email = prefix + "-sem-aceite@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = false },
+        HttpStatusCode.BadRequest, "Cadastro rejeita aceite LGPD falso");
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new { email = prefix + "-aceite-ausente@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente" },
+        HttpStatusCode.BadRequest, "Cadastro rejeita aceite LGPD ausente");
     foreach (var role in new[] { "Admin", "Clinica", "Desconhecido", "" })
-        await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[2], senha = "Regression123!", tipoUsuario = role }, HttpStatusCode.BadRequest, "Cadastro rejeita papel " + role);
+        await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[2], senha = "Regression123!", tipoUsuario = role, aceiteLgpd = true }, HttpStatusCode.BadRequest, "Cadastro rejeita papel " + role);
     for (var i = 0; i < 2; i++)
     {
-        var result = await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[i], senha = "Regression123!", tipoUsuario = i == 0 ? " paciente " : "pRoFiSsIoNaL" }, HttpStatusCode.OK, "Cadastro com normalizacao");
+        var result = await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[i], senha = "Regression123!", tipoUsuario = i == 0 ? " paciente " : "pRoFiSsIoNaL", aceiteLgpd = true }, HttpStatusCode.OK, "Cadastro com normalizacao");
         Check(result.GetProperty("dados").GetProperty("tipoUsuario").GetString() == (i == 0 ? "Paciente" : "Profissional"), "Papel canonico persistido");
     }
+    var aceitesPersistidos = await db.Usuarios.AsNoTracking()
+        .Where(u => emails.Take(2).Contains(u.Email))
+        .ToListAsync();
+    Check(aceitesPersistidos.Count == 2 && aceitesPersistidos.All(u =>
+            u.AceiteLgpd && u.AceiteLgpdEm.HasValue),
+        "Cadastro persiste aceite LGPD e sua data");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = emails[2], senha = "Regression123!", tipoUsuario = "Paciente" },
+        new { email = emails[2], senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = true },
         HttpStatusCode.OK, "Cadastro de segundo paciente para isolar a agenda");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = emails[3], senha = "Regression123!", tipoUsuario = "Profissional" },
+        new { email = emails[3], senha = "Regression123!", tipoUsuario = "Profissional", aceiteLgpd = true },
         HttpStatusCode.OK, "Cadastro de segundo profissional para o historico");
     async Task<string> Login(int index)
     {
@@ -218,6 +246,16 @@ try
     await Request(HttpMethod.Post, "/api/auth/login", new { email = emails[0], senha = "errada" }, HttpStatusCode.Unauthorized, "Senha incorreta rejeitada");
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("11111111111", true), HttpStatusCode.BadRequest, "Rota paciente rejeita CPF invalido", patientToken);
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("11111111111"), HttpStatusCode.BadRequest, "Rota profissional rejeita CPF invalido", professionalToken);
+    await Request(HttpMethod.Put, "/api/profissional/completar-perfil", new
+    {
+        nomeCompleto = prefix,
+        cpf = "52998224725",
+        crefito = "CREFITO-TESTE",
+        telefone = "11999999999",
+        dataNascimento = "1990-01-01",
+        bio = "Sem endereco",
+        ativo = true
+    }, HttpStatusCode.BadRequest, "Rota profissional exige endereco de atendimento", professionalToken);
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725"), HttpStatusCode.Forbidden, "Paciente nao altera profissional", patientToken);
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("52998224725", true), HttpStatusCode.Forbidden, "Profissional nao altera paciente", professionalToken);
     await Request(HttpMethod.Put, "/api/paciente/completar-perfil", Patient("52998224725", true), HttpStatusCode.OK, "Paciente preenche endereco", patientToken);
@@ -314,8 +352,10 @@ try
         profissionalMe.GetProperty("email").GetString() == emails[1] &&
         profissionalMe.GetProperty("cpf").GetString() == "52998224725" &&
         profissionalMe.GetProperty("dataNascimento").ValueKind == JsonValueKind.String &&
+        profissionalMe.GetProperty("endereco").GetProperty("rua").GetString() == "Avenida Paulista" &&
+        profissionalMe.GetProperty("endereco").GetProperty("cep").GetString() == "01310100" &&
         profissionalMe.GetProperty("fotoPerfilUrl").ValueKind == JsonValueKind.Null,
-        "Perfil proprio devolve os dados privados do usuario correto");
+        "Perfil proprio devolve os dados privados e o endereco de atendimento corretos");
     await Request(HttpMethod.Delete, "/api/profissional/me/foto", null, HttpStatusCode.Forbidden,
         "Paciente nao remove foto de profissional", patientToken);
     await Request(HttpMethod.Delete, "/api/profissional/me/foto", null, HttpStatusCode.NoContent,
@@ -735,13 +775,14 @@ finally
 {
     // Exclui somente os registros criados por esta execução, por e-mails exatos.
     var patients = await db.Pacientes.Include(p => p.Endereco).Where(p => emails.Contains(p.Usuario.Email)).ToListAsync();
-    var professionals = await db.Profissionais.Where(p => emails.Contains(p.Usuario.Email)).ToListAsync();
+    var professionals = await db.Profissionais.Include(p => p.Endereco).Where(p => emails.Contains(p.Usuario.Email)).ToListAsync();
     var patientIds = patients.Select(p => p.Id).ToArray();
     var professionalIds = professionals.Select(p => p.Id).ToArray();
     db.BloqueiosAgenda.RemoveRange(await db.BloqueiosAgenda
         .Where(b => professionalIds.Contains(b.ProfissionalId)).ToListAsync());
     db.Agendamentos.RemoveRange(await db.Agendamentos.Where(a => patientIds.Contains(a.PacienteId) || professionalIds.Contains(a.ProfissionalId)).ToListAsync());
     db.Enderecos.RemoveRange(patients.Select(p => p.Endereco));
+    db.Enderecos.RemoveRange(professionals.Where(p => p.Endereco != null).Select(p => p.Endereco!));
     db.Pacientes.RemoveRange(patients);
     db.Profissionais.RemoveRange(professionals);
     db.Usuarios.RemoveRange(await db.Usuarios.Where(u => emails.Contains(u.Email)).ToListAsync());

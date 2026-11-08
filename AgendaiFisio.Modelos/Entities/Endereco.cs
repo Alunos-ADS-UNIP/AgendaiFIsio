@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace AgendaiFisio.Entities
 {
-    // Guarda os dados de endereço de um paciente.
+    // Guarda o endereço residencial do paciente ou o local de atendimento do profissional.
     public class Endereco
     {
         public Guid Id { get; set; } = Guid.NewGuid();

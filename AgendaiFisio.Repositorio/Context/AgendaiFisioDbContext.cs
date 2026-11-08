@@ -86,6 +86,14 @@ namespace AgendaiFisio.Context
                 .HasForeignKey(p => p.EspecialidadeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Um endereço de atendimento pertence a no máximo um profissional.
+            // O vínculo é opcional somente para compatibilidade com cadastros antigos.
+            modelBuilder.Entity<Profissional>()
+                .HasOne(p => p.Endereco)
+                .WithOne()
+                .HasForeignKey<Profissional>(p => p.EnderecoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Evita apagar avaliações junto com o profissional.
             modelBuilder.Entity<AvaliacaoFisioterapeuta>()
                 .HasOne(a => a.Profissional)

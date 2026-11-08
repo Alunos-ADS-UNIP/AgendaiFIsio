@@ -76,7 +76,17 @@ namespace AgendaiFisio.Services.Profissional
                         : new EspecialidadeResponseDTO { Id = p.Especialidade.Id, Nome = p.Especialidade.Nome },
                     p.Crefito,
                     p.FotoPerfilChave,
-                    p.Ativo
+                    p.Ativo,
+                    Endereco = p.Endereco == null ? null : new EnderecoProfissionalDTO
+                    {
+                        Rua = p.Endereco.Rua,
+                        Numero = p.Endereco.Numero,
+                        Complemento = p.Endereco.Complemento,
+                        Cep = p.Endereco.Cep,
+                        Bairro = p.Endereco.Bairro,
+                        Cidade = p.Endereco.Cidade,
+                        Estado = p.Endereco.Estado
+                    }
                 })
                 .ToListAsync();
 
@@ -87,7 +97,8 @@ namespace AgendaiFisio.Services.Profissional
                 Especialidade = p.Especialidade,
                 Crefito = p.Crefito,
                 FotoPerfilUrl = GerarUrlFoto(p.FotoPerfilChave),
-                Ativo = p.Ativo
+                Ativo = p.Ativo,
+                Endereco = p.Endereco
             }).ToList();
 
             return new PagedResultDTO<ProfissionalListItemDTO>
@@ -105,6 +116,7 @@ namespace AgendaiFisio.Services.Profissional
                 .AsNoTracking()
                 .Include(p => p.Usuario)
                 .Include(p => p.Especialidade)
+                .Include(p => p.Endereco)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (profissional is null)
@@ -125,7 +137,8 @@ namespace AgendaiFisio.Services.Profissional
                 FotoPerfilUrl = GerarUrlFoto(profissional.FotoPerfilChave),
                 DataCadastro = profissional.DataCadastro,
                 Ativo = profissional.Ativo,
-                Email = profissional.Usuario?.Email ?? string.Empty
+                Email = profissional.Usuario?.Email ?? string.Empty,
+                Endereco = MapearEndereco(profissional.Endereco)
             };
         }
 
@@ -185,6 +198,7 @@ namespace AgendaiFisio.Services.Profissional
                 .AsNoTracking()
                 .Include(p => p.Usuario)
                 .Include(p => p.Especialidade)
+                .Include(p => p.Endereco)
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (profissional is null)
@@ -206,6 +220,7 @@ namespace AgendaiFisio.Services.Profissional
                 DataCadastro = profissional.DataCadastro,
                 Ativo = profissional.Ativo,
                 Email = profissional.Usuario?.Email ?? string.Empty,
+                Endereco = MapearEndereco(profissional.Endereco),
                 Cpf = profissional.Cpf,
                 DataNascimento = profissional.DataNascimento.Year > 1
                     ? DateTime.SpecifyKind(profissional.DataNascimento, DateTimeKind.Unspecified)
@@ -216,6 +231,7 @@ namespace AgendaiFisio.Services.Profissional
         public async Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto)
         {
             var profissional = await _profissionais.Consultar()
+                .Include(p => p.Endereco)
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (profissional is null)
@@ -243,8 +259,31 @@ namespace AgendaiFisio.Services.Profissional
             profissional.DataNascimento = dto.DataNascimento;
             profissional.Bio = dto.Bio?.Trim() ?? string.Empty;
             profissional.Ativo = dto.Ativo;
+            profissional.Endereco ??= new Entities.Endereco();
+            profissional.Endereco.Rua = dto.Rua.Trim();
+            profissional.Endereco.Numero = dto.Numero.Trim();
+            profissional.Endereco.Complemento = dto.Complemento?.Trim() ?? string.Empty;
+            profissional.Endereco.Cep = dto.Cep.Trim();
+            profissional.Endereco.Bairro = dto.Bairro.Trim();
+            profissional.Endereco.Cidade = dto.Cidade.Trim();
+            profissional.Endereco.Estado = dto.Estado.Trim().ToUpperInvariant();
 
             await _unidadeDeTrabalho.SalvarAsync();
+        }
+
+        private static EnderecoProfissionalDTO? MapearEndereco(Entities.Endereco? endereco)
+        {
+            if (endereco is null) return null;
+            return new EnderecoProfissionalDTO
+            {
+                Rua = endereco.Rua,
+                Numero = endereco.Numero,
+                Complemento = endereco.Complemento,
+                Cep = endereco.Cep,
+                Bairro = endereco.Bairro,
+                Cidade = endereco.Cidade,
+                Estado = endereco.Estado
+            };
         }
 
         public async Task<FotoPerfilResponseDTO> AtualizarFotoPerfilAsync(
