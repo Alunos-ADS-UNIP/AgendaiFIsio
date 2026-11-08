@@ -33,6 +33,33 @@ namespace AgendaiFisio.DTOs.Profissional
         [StringLength(1000, ErrorMessage = "A bio pode ter no máximo 1000 caracteres.")]
         public string Bio { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "A rua do local de atendimento é obrigatória.")]
+        [StringLength(150, ErrorMessage = "A rua pode ter no máximo 150 caracteres.")]
+        public string Rua { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "O número do local de atendimento é obrigatório.")]
+        [StringLength(20, ErrorMessage = "O número pode ter no máximo 20 caracteres.")]
+        public string Numero { get; set; } = string.Empty;
+
+        [StringLength(100, ErrorMessage = "O complemento pode ter no máximo 100 caracteres.")]
+        public string Complemento { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "O CEP do local de atendimento é obrigatório.")]
+        [RegularExpression(@"^\d{8}$", ErrorMessage = "O CEP deve conter 8 dígitos numéricos.")]
+        public string Cep { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "O bairro do local de atendimento é obrigatório.")]
+        [StringLength(100, ErrorMessage = "O bairro pode ter no máximo 100 caracteres.")]
+        public string Bairro { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "A cidade do local de atendimento é obrigatória.")]
+        [StringLength(100, ErrorMessage = "A cidade pode ter no máximo 100 caracteres.")]
+        public string Cidade { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "O estado do local de atendimento é obrigatório.")]
+        [RegularExpression(@"^[A-Za-z]{2}$", ErrorMessage = "Informe a sigla do estado com 2 letras.")]
+        public string Estado { get; set; } = string.Empty;
+
         public bool Ativo { get; set; }
     }
 }

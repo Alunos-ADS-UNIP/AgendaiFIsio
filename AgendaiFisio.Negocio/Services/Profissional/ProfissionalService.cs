@@ -8,6 +8,7 @@ using AgendaiFisio.DTOs.Especialidade;
 using AgendaiFisio.DTOs.Profissional;
 using AgendaiFisio.Constants;
 using AgendaiFisio.Repositorio.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace AgendaiFisio.Services.Profissional
 {
@@ -18,19 +19,25 @@ namespace AgendaiFisio.Services.Profissional
         private readonly IBloqueioAgendaRepositorio _bloqueios;
         private readonly IAgendamentoRepositorio _agendamentos;
         private readonly IUnidadeDeTrabalho _unidadeDeTrabalho;
+        private readonly IArmazenamentoFotoPerfil _armazenamentoFotos;
+        private readonly ILogger<ProfissionalService> _logger;
 
         public ProfissionalService(
             IProfissionalRepositorio profissionais,
             IEspecialidadeRepositorio especialidades,
             IBloqueioAgendaRepositorio bloqueios,
             IAgendamentoRepositorio agendamentos,
-            IUnidadeDeTrabalho unidadeDeTrabalho)
+            IUnidadeDeTrabalho unidadeDeTrabalho,
+            IArmazenamentoFotoPerfil armazenamentoFotos,
+            ILogger<ProfissionalService> logger)
         {
             _profissionais = profissionais;
             _especialidades = especialidades;
             _bloqueios = bloqueios;
             _agendamentos = agendamentos;
             _unidadeDeTrabalho = unidadeDeTrabalho;
+            _armazenamentoFotos = armazenamentoFotos;
+            _logger = logger;
         }
 
         public async Task<PagedResultDTO<ProfissionalListItemDTO>> ListarAsync(ProfissionalFiltroDTO filtro)
@@ -56,21 +63,43 @@ namespace AgendaiFisio.Services.Profissional
 
             var totalRegistros = await query.CountAsync();
 
-            var itens = await query
+            var registros = await query
                 .OrderBy(p => p.NomeCompleto)
                 .Skip((filtro.Pagina - 1) * filtro.TamanhoPagina)
                 .Take(filtro.TamanhoPagina)
-                .Select(p => new ProfissionalListItemDTO
+                .Select(p => new
                 {
-                    Id = p.Id,
-                    NomeCompleto = p.NomeCompleto,
+                    p.Id,
+                    p.NomeCompleto,
                     Especialidade = p.Especialidade == null
                         ? null
                         : new EspecialidadeResponseDTO { Id = p.Especialidade.Id, Nome = p.Especialidade.Nome },
-                    Crefito = p.Crefito,
-                    Ativo = p.Ativo
+                    p.Crefito,
+                    p.FotoPerfilChave,
+                    p.Ativo,
+                    Endereco = p.Endereco == null ? null : new EnderecoProfissionalDTO
+                    {
+                        Rua = p.Endereco.Rua,
+                        Numero = p.Endereco.Numero,
+                        Complemento = p.Endereco.Complemento,
+                        Cep = p.Endereco.Cep,
+                        Bairro = p.Endereco.Bairro,
+                        Cidade = p.Endereco.Cidade,
+                        Estado = p.Endereco.Estado
+                    }
                 })
                 .ToListAsync();
+
+            var itens = registros.Select(p => new ProfissionalListItemDTO
+            {
+                Id = p.Id,
+                NomeCompleto = p.NomeCompleto,
+                Especialidade = p.Especialidade,
+                Crefito = p.Crefito,
+                FotoPerfilUrl = GerarUrlFoto(p.FotoPerfilChave),
+                Ativo = p.Ativo,
+                Endereco = p.Endereco
+            }).ToList();
 
             return new PagedResultDTO<ProfissionalListItemDTO>
             {
@@ -87,6 +116,7 @@ namespace AgendaiFisio.Services.Profissional
                 .AsNoTracking()
                 .Include(p => p.Usuario)
                 .Include(p => p.Especialidade)
+                .Include(p => p.Endereco)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (profissional is null)
@@ -104,9 +134,11 @@ namespace AgendaiFisio.Services.Profissional
                     ? null
                     : new EspecialidadeResponseDTO { Id = profissional.Especialidade.Id, Nome = profissional.Especialidade.Nome },
                 Bio = profissional.Bio,
+                FotoPerfilUrl = GerarUrlFoto(profissional.FotoPerfilChave),
                 DataCadastro = profissional.DataCadastro,
                 Ativo = profissional.Ativo,
-                Email = profissional.Usuario?.Email ?? string.Empty
+                Email = profissional.Usuario?.Email ?? string.Empty,
+                Endereco = MapearEndereco(profissional.Endereco)
             };
         }
 
@@ -166,6 +198,7 @@ namespace AgendaiFisio.Services.Profissional
                 .AsNoTracking()
                 .Include(p => p.Usuario)
                 .Include(p => p.Especialidade)
+                .Include(p => p.Endereco)
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (profissional is null)
@@ -183,9 +216,11 @@ namespace AgendaiFisio.Services.Profissional
                     ? null
                     : new EspecialidadeResponseDTO { Id = profissional.Especialidade.Id, Nome = profissional.Especialidade.Nome },
                 Bio = profissional.Bio,
+                FotoPerfilUrl = GerarUrlFoto(profissional.FotoPerfilChave),
                 DataCadastro = profissional.DataCadastro,
                 Ativo = profissional.Ativo,
                 Email = profissional.Usuario?.Email ?? string.Empty,
+                Endereco = MapearEndereco(profissional.Endereco),
                 Cpf = profissional.Cpf,
                 DataNascimento = profissional.DataNascimento.Year > 1
                     ? DateTime.SpecifyKind(profissional.DataNascimento, DateTimeKind.Unspecified)
@@ -196,6 +231,7 @@ namespace AgendaiFisio.Services.Profissional
         public async Task AtualizarAsync(Guid usuarioId, ProfissionalUpdateDTO dto)
         {
             var profissional = await _profissionais.Consultar()
+                .Include(p => p.Endereco)
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (profissional is null)
@@ -223,8 +259,130 @@ namespace AgendaiFisio.Services.Profissional
             profissional.DataNascimento = dto.DataNascimento;
             profissional.Bio = dto.Bio?.Trim() ?? string.Empty;
             profissional.Ativo = dto.Ativo;
+            profissional.Endereco ??= new Entities.Endereco();
+            profissional.Endereco.Rua = dto.Rua.Trim();
+            profissional.Endereco.Numero = dto.Numero.Trim();
+            profissional.Endereco.Complemento = dto.Complemento?.Trim() ?? string.Empty;
+            profissional.Endereco.Cep = dto.Cep.Trim();
+            profissional.Endereco.Bairro = dto.Bairro.Trim();
+            profissional.Endereco.Cidade = dto.Cidade.Trim();
+            profissional.Endereco.Estado = dto.Estado.Trim().ToUpperInvariant();
 
             await _unidadeDeTrabalho.SalvarAsync();
+        }
+
+        private static EnderecoProfissionalDTO? MapearEndereco(Entities.Endereco? endereco)
+        {
+            if (endereco is null) return null;
+            return new EnderecoProfissionalDTO
+            {
+                Rua = endereco.Rua,
+                Numero = endereco.Numero,
+                Complemento = endereco.Complemento,
+                Cep = endereco.Cep,
+                Bairro = endereco.Bairro,
+                Cidade = endereco.Cidade,
+                Estado = endereco.Estado
+            };
+        }
+
+        public async Task<FotoPerfilResponseDTO> AtualizarFotoPerfilAsync(
+            Guid usuarioId,
+            Stream conteudo,
+            long tamanho,
+            string tipoConteudo,
+            CancellationToken cancellationToken = default)
+        {
+            if (tamanho <= 0)
+                throw new ArgumentException("Selecione uma imagem para enviar.");
+            if (tamanho > _armazenamentoFotos.TamanhoMaximoBytes)
+                throw new ArgumentException($"A foto deve ter no máximo {_armazenamentoFotos.TamanhoMaximoBytes / 1024 / 1024} MB.");
+
+            var profissional = await _profissionais.Consultar()
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId, cancellationToken);
+            if (profissional is null)
+                throw new KeyNotFoundException("Fisioterapeuta não encontrado para o usuário informado.");
+
+            await using var imagem = new MemoryStream((int)tamanho);
+            await conteudo.CopyToAsync(imagem, cancellationToken);
+            if (imagem.Length > _armazenamentoFotos.TamanhoMaximoBytes)
+                throw new ArgumentException($"A foto deve ter no máximo {_armazenamentoFotos.TamanhoMaximoBytes / 1024 / 1024} MB.");
+
+            var tipoDetectado = DetectarTipoImagem(imagem.GetBuffer().AsSpan(0, (int)imagem.Length));
+            if (tipoDetectado is null)
+                throw new ArgumentException("O arquivo deve ser uma imagem JPEG, PNG ou WebP válida.");
+            if (!string.Equals(tipoConteudo, tipoDetectado, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("O conteúdo do arquivo não corresponde ao tipo de imagem informado.");
+
+            imagem.Position = 0;
+            var chaveAnterior = profissional.FotoPerfilChave;
+            var novaChave = await _armazenamentoFotos.SalvarAsync(
+                profissional.Id, imagem, tipoDetectado, cancellationToken);
+
+            profissional.FotoPerfilChave = novaChave;
+            try
+            {
+                await _unidadeDeTrabalho.SalvarAsync(cancellationToken);
+            }
+            catch
+            {
+                await TentarExcluirAsync(novaChave);
+                throw;
+            }
+
+            if (!string.IsNullOrWhiteSpace(chaveAnterior))
+                await TentarExcluirAsync(chaveAnterior);
+
+            return new FotoPerfilResponseDTO
+            {
+                Mensagem = "Foto de perfil atualizada com sucesso.",
+                FotoPerfilUrl = GerarUrlFoto(novaChave)
+            };
+        }
+
+        public async Task RemoverFotoPerfilAsync(
+            Guid usuarioId,
+            CancellationToken cancellationToken = default)
+        {
+            var profissional = await _profissionais.Consultar()
+                .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId, cancellationToken);
+            if (profissional is null)
+                throw new KeyNotFoundException("Fisioterapeuta não encontrado para o usuário informado.");
+
+            var chaveAnterior = profissional.FotoPerfilChave;
+            profissional.FotoPerfilChave = null;
+            await _unidadeDeTrabalho.SalvarAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(chaveAnterior))
+                await TentarExcluirAsync(chaveAnterior);
+        }
+
+        private string? GerarUrlFoto(string? chave) =>
+            string.IsNullOrWhiteSpace(chave) ? null : _armazenamentoFotos.GerarUrlLeitura(chave);
+
+        private async Task TentarExcluirAsync(string chave)
+        {
+            try
+            {
+                await _armazenamentoFotos.ExcluirAsync(chave, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Não foi possível remover o objeto S3 {FotoPerfilChave}.", chave);
+            }
+        }
+
+        private static string? DetectarTipoImagem(ReadOnlySpan<byte> bytes)
+        {
+            if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+                return "image/jpeg";
+            if (bytes.Length >= 8 && bytes[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
+                return "image/png";
+            if (bytes.Length >= 12 &&
+                bytes[..4].SequenceEqual("RIFF"u8) &&
+                bytes.Slice(8, 4).SequenceEqual("WEBP"u8))
+                return "image/webp";
+            return null;
         }
 
         public async Task AtualizarEspecialidadeAsync(Guid usuarioId, Guid especialidadeId)

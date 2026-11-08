@@ -14,6 +14,9 @@ using AgendaiFisio.Services.BloqueioAgenda;
 using AgendaiFisio.OpenApi;
 using AgendaiFisio.Repositorio.Interfaces;
 using AgendaiFisio.Repositorio.Repositorios;
+using AgendaiFisio.Repositorio.Armazenamento;
+using Amazon;
+using Amazon.S3;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +38,11 @@ builder.Services.AddScoped<IEspecialidadeRepositorio, EspecialidadeRepositorio>(
 builder.Services.AddScoped<IAgendamentoRepositorio, AgendamentoRepositorio>();
 builder.Services.AddScoped<IBloqueioAgendaRepositorio, BloqueioAgendaRepositorio>();
 builder.Services.AddScoped<IUnidadeDeTrabalho, UnidadeDeTrabalho>();
+builder.Services.Configure<FotosPerfilOptions>(builder.Configuration.GetSection(FotosPerfilOptions.Secao));
+var awsRegion = builder.Configuration["AWS_REGION"] ?? "sa-east-1";
+builder.Services.AddSingleton<IAmazonS3>(_ =>
+    new AmazonS3Client(RegionEndpoint.GetBySystemName(awsRegion)));
+builder.Services.AddSingleton<IArmazenamentoFotoPerfil, S3ArmazenamentoFotoPerfil>();
 
 // Negócio: os controllers recebem somente serviços desta camada.
 builder.Services.AddScoped<IAuthService, AuthService>();

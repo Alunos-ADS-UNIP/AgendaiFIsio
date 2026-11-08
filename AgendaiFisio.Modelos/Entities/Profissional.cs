@@ -16,8 +16,16 @@ namespace AgendaiFisio.Entities
         public string Telefone { get; set; } = string.Empty;
         public DateTime DataNascimento { get; set; }
         public string Bio { get; set; } = string.Empty;
+        // Chave privada do objeto no S3. A URL de leitura é gerada sob demanda e nunca é persistida.
+        public string? FotoPerfilChave { get; set; }
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; } = true;
+
+        // Local onde o profissional realiza os atendimentos. A FK continua
+        // anulável para que perfis criados antes desta funcionalidade possam
+        // entrar no aplicativo e completar o endereço sem quebrar a migration.
+        public Guid? EnderecoId { get; set; }
+        public virtual Endereco? Endereco { get; set; }
 
         // Vínculo com o catálogo. Fica nulo até o profissional escolher uma opção (no cadastro
         // ou depois, editando o perfil) — ver PUT api/profissional/especialidade.

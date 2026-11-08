@@ -9,6 +9,7 @@ using AgendaiFisio.DTOs.BloqueioAgenda;
 using AgendaiFisio.DTOs.Profissional;
 using AgendaiFisio.Services.Profissional;
 using AgendaiFisio.Services.Auth;
+using AgendaiFisio.Repositorio.Armazenamento;
 
 namespace AgendaiFisio.Controllers
 {
@@ -62,6 +63,67 @@ namespace AgendaiFisio.Controllers
             try
             {
                 return Ok(await _profissionalService.ObterMeuPerfilAsync(usuarioAtual.UsuarioId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+        }
+
+        // Envia ou substitui a foto do profissional autenticado. O arquivo fica privado no S3;
+        // a resposta contém somente uma URL temporária de leitura.
+        [HttpPut("me/foto")]
+        [Authorize(Roles = PerfilDeUsuario.Profissional)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(6 * 1024 * 1024)]
+        public async Task<IActionResult> AtualizarFotoPerfil(
+            [FromForm] IFormFile arquivo,
+            CancellationToken cancellationToken)
+        {
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                await using var conteudo = arquivo.OpenReadStream();
+                var resultado = await _profissionalService.AtualizarFotoPerfilAsync(
+                    usuarioAtual.UsuarioId,
+                    conteudo,
+                    arquivo.Length,
+                    arquivo.ContentType,
+                    cancellationToken);
+                return Ok(resultado);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (ArmazenamentoFotoException ex)
+            {
+                _logger.LogError(ex, "Falha no armazenamento da foto de perfil.");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    new { erro = "O serviço de fotos está temporariamente indisponível." });
+            }
+        }
+
+        [HttpDelete("me/foto")]
+        [Authorize(Roles = PerfilDeUsuario.Profissional)]
+        public async Task<IActionResult> RemoverFotoPerfil(CancellationToken cancellationToken)
+        {
+            var usuarioAtual = _usuarioAtualService.Obter();
+            if (usuarioAtual is null)
+                return Unauthorized(new { erro = "Usuário não identificado no token." });
+
+            try
+            {
+                await _profissionalService.RemoverFotoPerfilAsync(
+                    usuarioAtual.UsuarioId, cancellationToken);
+                return NoContent();
             }
             catch (KeyNotFoundException ex)
             {
