@@ -43,6 +43,23 @@ async Task<bool> TableExistsAsync(string table)
     return Convert.ToInt32(await command.ExecuteScalarAsync()) == 1;
 }
 
+async Task<bool> ColumnExistsAsync(string table, string column)
+{
+    await using var context = new AgendaiFisioDbContext(options);
+    await using var command = context.Database.GetDbConnection().CreateCommand();
+    command.CommandText = "SELECT CASE WHEN COL_LENGTH(@table, @column) IS NULL THEN 0 ELSE 1 END";
+    var tableParameter = command.CreateParameter();
+    tableParameter.ParameterName = "table";
+    tableParameter.Value = "dbo." + table;
+    command.Parameters.Add(tableParameter);
+    var columnParameter = command.CreateParameter();
+    columnParameter.ParameterName = "column";
+    columnParameter.Value = column;
+    command.Parameters.Add(columnParameter);
+    await context.Database.OpenConnectionAsync();
+    return Convert.ToInt32(await command.ExecuteScalarAsync()) == 1;
+}
+
 async Task ExpectSqlErrorAsync(Func<Task> action, int number, string name)
 {
     try
@@ -74,6 +91,8 @@ try
 
     Check(await TableExistsAsync("BloqueiosAgenda"),
         "Migration inicial cria BloqueiosAgenda");
+    Check(await ColumnExistsAsync("Profissionais", "FotoPerfilChave"),
+        "Migration adiciona a chave privada da foto de perfil");
 
     var profissionalId = Guid.NewGuid();
     var horario = DateTime.UtcNow.Date.AddDays(20).AddHours(12);

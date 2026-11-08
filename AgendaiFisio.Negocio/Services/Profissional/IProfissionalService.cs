@@ -29,5 +29,16 @@ namespace AgendaiFisio.Services.Profissional
 
         // Escolhe ou substitui a especialidade do fisioterapeuta identificado pelo usuário logado.
         Task AtualizarEspecialidadeAsync(Guid usuarioId, Guid especialidadeId);
+
+        // Salva ou substitui a foto do próprio profissional autenticado.
+        Task<FotoPerfilResponseDTO> AtualizarFotoPerfilAsync(
+            Guid usuarioId,
+            Stream conteudo,
+            long tamanho,
+            string tipoConteudo,
+            CancellationToken cancellationToken = default);
+
+        // Remove a foto do próprio profissional autenticado.
+        Task RemoverFotoPerfilAsync(Guid usuarioId, CancellationToken cancellationToken = default);
     }
 }

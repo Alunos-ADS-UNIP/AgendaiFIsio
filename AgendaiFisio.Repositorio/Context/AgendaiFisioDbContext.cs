@@ -50,6 +50,9 @@ namespace AgendaiFisio.Context
             modelBuilder.Entity<Profissional>()
                 .Property(p => p.DataNascimento)
                 .HasColumnType("date");
+            modelBuilder.Entity<Profissional>()
+                .Property(p => p.FotoPerfilChave)
+                .HasMaxLength(500);
 
             // Impede dois fisioterapeutas com o mesmo CREFITO, ignorando os cadastros ainda em branco.
             modelBuilder.Entity<Profissional>()

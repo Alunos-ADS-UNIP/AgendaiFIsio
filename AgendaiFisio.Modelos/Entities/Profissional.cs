@@ -16,6 +16,8 @@ namespace AgendaiFisio.Entities
         public string Telefone { get; set; } = string.Empty;
         public DateTime DataNascimento { get; set; }
         public string Bio { get; set; } = string.Empty;
+        // Chave privada do objeto no S3. A URL de leitura é gerada sob demanda e nunca é persistida.
+        public string? FotoPerfilChave { get; set; }
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; } = true;
 

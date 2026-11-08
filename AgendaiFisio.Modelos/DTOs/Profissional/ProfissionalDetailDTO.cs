@@ -15,6 +15,7 @@ namespace AgendaiFisio.DTOs.Profissional
         public EspecialidadeResponseDTO? Especialidade { get; set; }
 
         public string Bio { get; set; } = string.Empty;
+        public string? FotoPerfilUrl { get; set; }
         public DateTime DataCadastro { get; set; }
         public bool Ativo { get; set; }
         public string Email { get; set; } = string.Empty;

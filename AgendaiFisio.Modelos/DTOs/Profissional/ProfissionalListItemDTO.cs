@@ -13,6 +13,7 @@ namespace AgendaiFisio.DTOs.Profissional
         public EspecialidadeResponseDTO? Especialidade { get; set; }
 
         public string Crefito { get; set; } = string.Empty;
+        public string? FotoPerfilUrl { get; set; }
         public bool Ativo { get; set; }
     }
 }

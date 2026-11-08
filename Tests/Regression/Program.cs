@@ -57,6 +57,24 @@ async Task<JsonElement> Request(HttpMethod method, string path, object? body, Ht
     Check(result.StatusCode == expected, name + " (HTTP " + (int)result.StatusCode + ")");
     return result.Body;
 }
+async Task<JsonElement> RequestContent(
+    HttpMethod method,
+    string path,
+    HttpContent content,
+    HttpStatusCode expected,
+    string name,
+    string? token = null)
+{
+    using var request = new HttpRequestMessage(method, path) { Content = content };
+    if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    using var response = await http.SendAsync(request);
+    var text = await response.Content.ReadAsStringAsync();
+    var parsed = string.IsNullOrWhiteSpace(text)
+        ? default
+        : JsonDocument.Parse(text).RootElement.Clone();
+    Check(response.StatusCode == expected, name + " (HTTP " + (int)response.StatusCode + ")");
+    return parsed;
+}
 string CreateExpiredToken()
 {
     var jwtSettings = config.GetSection("JwtSettings");
@@ -295,8 +313,21 @@ try
     Check(profissionalMe.GetProperty("id").GetGuid() == professional.Id &&
         profissionalMe.GetProperty("email").GetString() == emails[1] &&
         profissionalMe.GetProperty("cpf").GetString() == "52998224725" &&
-        profissionalMe.GetProperty("dataNascimento").ValueKind == JsonValueKind.String,
+        profissionalMe.GetProperty("dataNascimento").ValueKind == JsonValueKind.String &&
+        profissionalMe.GetProperty("fotoPerfilUrl").ValueKind == JsonValueKind.Null,
         "Perfil proprio devolve os dados privados do usuario correto");
+    await Request(HttpMethod.Delete, "/api/profissional/me/foto", null, HttpStatusCode.Forbidden,
+        "Paciente nao remove foto de profissional", patientToken);
+    await Request(HttpMethod.Delete, "/api/profissional/me/foto", null, HttpStatusCode.NoContent,
+        "Remover foto inexistente e idempotente", professionalToken);
+    using (var multipart = new MultipartFormDataContent())
+    {
+        var arquivoFalso = new ByteArrayContent(Encoding.UTF8.GetBytes("isto nao e uma imagem"));
+        arquivoFalso.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        multipart.Add(arquivoFalso, "arquivo", "foto.jpg");
+        await RequestContent(HttpMethod.Put, "/api/profissional/me/foto", multipart,
+            HttpStatusCode.BadRequest, "Upload rejeita arquivo que nao e imagem", professionalToken);
+    }
 
     var inicioIndisponibilidade = DateTime.UtcNow.Date.AddDays(5);
     var fimIndisponibilidade = inicioIndisponibilidade.AddDays(1);
@@ -320,6 +351,8 @@ try
     var detail = await Request(HttpMethod.Get, "/api/profissional/" + professional.Id, null, HttpStatusCode.OK, "Detalhe profissional", patientToken);
     Check(!detail.TryGetProperty("cpf", out _) && !detail.TryGetProperty("dataNascimento", out _), "Resposta nao expoe CPF nem nascimento");
     Check(detail.GetProperty("especialidade").GetProperty("id").GetGuid() == especialidadeId, "Detalhe devolve especialidade escolhida");
+    Check(detail.GetProperty("fotoPerfilUrl").ValueKind == JsonValueKind.Null,
+        "Detalhe devolve foto nula enquanto o profissional nao enviou imagem");
     await Request(HttpMethod.Get, "/api/profissional?nome=" + prefix + "&ativo=true&pagina=1&tamanhoPagina=10", null, HttpStatusCode.OK, "Listagem com filtros", patientToken);
     await Request(HttpMethod.Get, "/api/profissional/" + Guid.NewGuid(), null, HttpStatusCode.NotFound, "Profissional inexistente", patientToken);
 
