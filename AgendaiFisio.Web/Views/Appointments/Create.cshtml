@@ -1,0 +1,22 @@
+@model AppointmentCreateViewModel
+@{
+    ViewData["Title"] = "Agendar consulta";
+}
+<a asp-action="Index" class="back-link"><span class="material-symbols-rounded">arrow_back</span> Voltar para a agenda</a>
+<header class="page-heading"><div><span class="eyebrow">Novo atendimento</span><h1>Agendar consulta</h1><p>Escolha o profissional e um horário disponível.</p></div></header>
+<div class="form-layout">
+    <form asp-action="Create" method="post" class="panel form-panel" data-appointment-form data-unavailability-url="@Url.Action("Unavailability", "Appointments", new { professionalId = Guid.Empty })">
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+        <div class="form-section"><div class="form-section__heading"><span>1</span><div><h2>Profissional</h2><p>Selecione quem realizará seu atendimento.</p></div></div>
+            <div class="form-field"><label asp-for="ProfessionalId"></label><select asp-for="ProfessionalId" data-professional-select><option value="">Escolha um profissional</option>@foreach (var professional in Model.Professionals) { <option value="@professional.Id">@professional.NomeCompleto — @(professional.Especialidade?.Nome ?? "Fisioterapia")</option> }</select><span asp-validation-for="ProfessionalId" class="field-error"></span></div>
+        </div>
+        <div class="form-section"><div class="form-section__heading"><span>2</span><div><h2>Data e horário</h2><p>As consultas começam em hora cheia e duram 1 hora.</p></div></div>
+            <div class="form-field"><label asp-for="LocalDateTime"></label><input asp-for="LocalDateTime" type="datetime-local" step="3600" data-appointment-date /><span asp-validation-for="LocalDateTime" class="field-error"></span><small data-availability-feedback>Escolha um profissional para consultar a disponibilidade.</small></div>
+        </div>
+        <div class="form-section"><div class="form-section__heading"><span>3</span><div><h2>Observações</h2><p>Conte algo importante para o profissional.</p></div></div>
+            <div class="form-field"><label asp-for="Notes"></label><textarea asp-for="Notes" rows="4" placeholder="Ex.: primeira consulta, dor no joelho..."></textarea><span asp-validation-for="Notes" class="field-error"></span></div>
+        </div>
+        <button type="submit" class="button button--primary button--full button--large"><span class="material-symbols-rounded">check</span> Confirmar agendamento</button>
+    </form>
+    <aside class="panel summary-panel"><span class="icon-tile"><span class="material-symbols-rounded">info</span></span><h2>Antes de confirmar</h2><ul><li>Confira se o endereço do profissional é adequado para você.</li><li>Chegue com alguns minutos de antecedência.</li><li>Você poderá reagendar ou cancelar pela agenda.</li></ul></aside>
+</div>

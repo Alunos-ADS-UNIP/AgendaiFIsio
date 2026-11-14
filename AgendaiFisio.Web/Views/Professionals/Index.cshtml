@@ -1,0 +1,55 @@
+@model ProfessionalDirectoryViewModel
+@{
+    ViewData["Title"] = "Profissionais";
+}
+<header class="page-heading"><div><span class="eyebrow">Encontre seu cuidado</span><h1>Fisioterapeutas</h1><p>Conheça os profissionais e escolha o atendimento ideal para você.</p></div></header>
+
+<form method="get" class="filter-bar">
+    <div class="input-wrap"><span class="material-symbols-rounded">search</span><input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome" /></div>
+    <select name="specialtyId" aria-label="Filtrar por especialidade">
+        <option value="">Todas as especialidades</option>
+        @foreach (var item in Model.Specialties)
+        {
+            if (Model.SpecialtyId == item.Id)
+            {
+                <option value="@item.Id" selected>@item.Nome</option>
+            }
+            else
+            {
+                <option value="@item.Id">@item.Nome</option>
+            }
+        }
+    </select>
+    <button class="button button--primary" type="submit">Filtrar</button>
+    @if (!string.IsNullOrWhiteSpace(Model.Search) || Model.SpecialtyId.HasValue) { <a asp-action="Index" class="button button--ghost">Limpar</a> }
+</form>
+
+@if (Model.Results.Itens.Count == 0)
+{
+    <section class="state-card state-card--center"><span class="material-symbols-rounded state-card__icon">person_search</span><h2>Nenhum profissional encontrado</h2><p>Tente remover os filtros ou buscar por outro nome.</p></section>
+}
+else
+{
+    <div class="professional-grid">
+        @foreach (var professional in Model.Results.Itens)
+        {
+            <article class="professional-card">
+                <a asp-action="Details" asp-route-id="@professional.Id" class="professional-card__main">
+                    @if (!string.IsNullOrWhiteSpace(professional.FotoPerfilUrl)) { <img src="@professional.FotoPerfilUrl" alt="Foto de @professional.NomeCompleto" /> } else { <span class="avatar avatar--large">@string.Join("", professional.NomeCompleto.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant()</span> }
+                    <div><span class="status-dot"><i></i> Disponível</span><h2>@professional.NomeCompleto</h2><p>@(professional.Especialidade?.Nome ?? "Especialidade a definir")</p><small>CREFITO @professional.Crefito</small></div>
+                </a>
+                <div class="professional-card__location"><span class="material-symbols-rounded">location_on</span><span>@(professional.Endereco is null ? "Local de atendimento a confirmar" : $"{professional.Endereco.Bairro}, {professional.Endereco.Cidade} - {professional.Endereco.Estado}")</span></div>
+                <div class="professional-card__actions"><a asp-action="Details" asp-route-id="@professional.Id" class="button button--outline">Ver perfil</a><a asp-controller="Appointments" asp-action="Create" asp-route-professionalId="@professional.Id" class="button button--primary">Agendar</a></div>
+            </article>
+        }
+    </div>
+    @if (Model.Results.TotalPaginas > 1)
+    {
+        <nav class="pagination" aria-label="Paginação">
+            @for (var pageNumber = 1; pageNumber <= Model.Results.TotalPaginas; pageNumber++)
+            {
+                <a asp-action="Index" asp-route-page="@pageNumber" asp-route-search="@Model.Search" asp-route-specialtyId="@Model.SpecialtyId" class="@(pageNumber == Model.Results.PaginaAtual ? "is-current" : "")">@pageNumber</a>
+            }
+        </nav>
+    }
+}

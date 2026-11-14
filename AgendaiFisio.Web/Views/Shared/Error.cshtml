@@ -1,0 +1,13 @@
+@{
+    ViewData["Title"] = "Algo deu errado";
+}
+<section class="state-card state-card--center">
+    <span class="material-symbols-rounded state-card__icon">cloud_off</span>
+    <h1>Não foi possível carregar esta página</h1>
+    <p>Tente novamente em alguns instantes. Se o problema continuar, confirme se o backend está disponível.</p>
+    @if (ViewData["ErrorDetail"] is string detail && !string.IsNullOrWhiteSpace(detail))
+    {
+        <p class="error-detail">@detail</p>
+    }
+    <a asp-controller="@(User.Identity?.IsAuthenticated == true ? "Dashboard" : "Home")" asp-action="Index" class="button button--primary">Voltar ao início</a>
+</section>

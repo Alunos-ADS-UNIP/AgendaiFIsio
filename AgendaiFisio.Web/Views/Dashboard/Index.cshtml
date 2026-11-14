@@ -1,0 +1,78 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Início";
+    var firstName = string.IsNullOrWhiteSpace(Model.DisplayName) || Model.DisplayName == "Cadastro Pendente"
+        ? string.Empty
+        : Model.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+    var upcoming = Model.Appointments
+        .Where(item => item.DataHora > DateTime.UtcNow && !item.Status.Equals("Cancelado", StringComparison.OrdinalIgnoreCase))
+        .OrderBy(item => item.DataHora)
+        .Take(Model.Role == "Profissional" ? 5 : 1)
+        .ToList();
+}
+<header class="page-heading">
+    <div><span class="eyebrow">@(Model.Role == "Profissional" ? "Área profissional" : "Área do paciente")</span><h1>Olá@(string.IsNullOrEmpty(firstName) ? "!" : $", {firstName}!")</h1><p>@(Model.Role == "Profissional" ? "Veja o resumo do seu dia e as próximas consultas." : "Como podemos cuidar de você hoje?")</p></div>
+    @if (Model.Role == "Paciente")
+    {
+        <a asp-controller="Appointments" asp-action="Create" class="button button--primary page-heading__action"><span class="material-symbols-rounded">add</span> Agendar consulta</a>
+    }
+</header>
+
+<section class="today-summary">
+    <div class="today-summary__icon"><span class="material-symbols-rounded">calendar_today</span></div>
+    <div><span>Hoje</span><strong>@(Model.TodayCount == 0 ? "Nenhuma consulta para hoje" : $"{Model.TodayCount} consulta{(Model.TodayCount == 1 ? "" : "s")} hoje")</strong></div>
+    <b>@Model.TodayCount</b>
+</section>
+
+<section class="content-section">
+    <div class="section-heading"><div><h2>Próximas consultas</h2><p>Seus atendimentos futuros aparecem em ordem de horário.</p></div>@if (upcoming.Count > 0) { <a asp-controller="Appointments" asp-action="Index">Ver agenda</a> }</div>
+    @if (upcoming.Count == 0)
+    {
+        <div class="empty-card"><span class="material-symbols-rounded">event_available</span><div><h3>Nenhuma consulta encontrada</h3><p>@(Model.Role == "Paciente" ? "Que tal agendar seu próximo atendimento?" : "Quando agendadas, suas consultas aparecerão aqui.")</p></div>@if (Model.Role == "Paciente") { <a asp-controller="Appointments" asp-action="Create" class="button button--outline">Agendar</a> }</div>
+    }
+    else
+    {
+        <div class="appointment-list">
+            @foreach (var appointment in upcoming)
+            {
+                var local = BrazilTime.ToLocal(appointment.DataHora);
+                var person = Model.Role == "Profissional" ? appointment.PacienteNome : appointment.ProfissionalNome;
+                <a asp-controller="Appointments" asp-action="Details" asp-route-id="@appointment.Id" class="appointment-card">
+                    <div class="date-badge"><strong>@local.Day.ToString("00")</strong><span>@local.ToString("MMM").ToUpperInvariant()</span></div>
+                    <div class="appointment-card__body"><div><h3>@(string.IsNullOrWhiteSpace(person) ? (Model.Role == "Profissional" ? "Paciente" : "Fisioterapeuta") : person)</h3><p><span class="material-symbols-rounded">schedule</span> @local.ToString("HH:mm") · @local.ToString("dddd", new System.Globalization.CultureInfo("pt-BR"))</p></div><span class="status-pill status-pill--@appointment.Status.ToLowerInvariant()">@appointment.Status</span></div>
+                    <span class="material-symbols-rounded appointment-card__arrow">chevron_right</span>
+                </a>
+            }
+        </div>
+    }
+</section>
+
+@if (Model.Role == "Paciente")
+{
+    <section class="schedule-callout"><span class="icon-tile icon-tile--on-dark"><span class="material-symbols-rounded">add_circle</span></span><div><h2>Agende sua consulta</h2><p>Escolha especialidade, profissional e horário em poucos passos.</p></div><a asp-controller="Appointments" asp-action="Create" class="button button--light">Começar <span class="material-symbols-rounded">arrow_forward</span></a></section>
+
+    @if (Model.Professionals.Count > 0)
+    {
+        var featured = Model.Professionals.First();
+        <section class="content-section">
+            <div class="section-heading"><div><h2>Fisioterapeuta em destaque</h2><p>Conheça um profissional disponível no AgendaiFisio.</p></div><a asp-controller="Professionals" asp-action="Index">Ver todos</a></div>
+            <article class="featured-professional">
+                @if (!string.IsNullOrWhiteSpace(featured.FotoPerfilUrl)) { <img src="@featured.FotoPerfilUrl" alt="Foto de @featured.NomeCompleto" /> } else { <span class="avatar avatar--large">@string.Join("", featured.NomeCompleto.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant()</span> }
+                <div><span class="eyebrow">Profissional em destaque</span><h3>@featured.NomeCompleto</h3><p>@(featured.Especialidade?.Nome ?? "Fisioterapia")</p><small><span class="material-symbols-rounded">location_on</span> @(featured.Endereco is null ? "Local a confirmar" : $"{featured.Endereco.Cidade} - {featured.Endereco.Estado}")</small></div>
+                <div class="featured-professional__actions"><a asp-controller="Professionals" asp-action="Details" asp-route-id="@featured.Id" class="button button--outline">Ver perfil</a><a asp-controller="Appointments" asp-action="Create" asp-route-professionalId="@featured.Id" class="button button--primary">Agendar</a></div>
+            </article>
+        </section>
+    }
+
+    @if (Model.Specialties.Count > 0)
+    {
+        <section class="content-section"><div class="section-heading"><div><h2>Especialidades em destaque</h2><p>Escolha a especialidade durante o agendamento.</p></div></div><div class="mini-specialty-grid">@foreach (var item in Model.Specialties) { <a asp-controller="Professionals" asp-action="Index" asp-route-specialtyId="@item.Id"><span class="icon-tile"><span class="material-symbols-rounded">spa</span></span><strong>@item.Nome</strong><span class="material-symbols-rounded">arrow_forward</span></a> }</div></section>
+    }
+}
+else
+{
+    <section class="quick-grid">
+        <a asp-controller="Availability" asp-action="Index" class="quick-card"><span class="icon-tile"><span class="material-symbols-rounded">edit_calendar</span></span><div><h3>Configurar horários</h3><p>Defina dias e horários em que você não poderá atender.</p></div><span class="material-symbols-rounded">arrow_forward</span></a>
+        <a asp-controller="Patients" asp-action="Index" class="quick-card"><span class="icon-tile icon-tile--blue"><span class="material-symbols-rounded">group</span></span><div><h3>Consultar pacientes</h3><p>Busque pacientes vinculados aos seus atendimentos.</p></div><span class="material-symbols-rounded">arrow_forward</span></a>
+    </section>
+}

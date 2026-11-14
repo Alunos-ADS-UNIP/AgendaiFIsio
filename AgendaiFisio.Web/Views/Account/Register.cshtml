@@ -1,0 +1,41 @@
+@model RegisterViewModel
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Criar conta";
+}
+<section class="auth-card auth-card--wide">
+    <div class="auth-card__heading"><h1>Criar conta</h1><p>Escolha como você vai usar o AgendaiFisio.</p></div>
+    <form asp-action="Register" method="post" class="form-stack" data-register-form>
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+        <fieldset class="role-picker">
+            <legend>Quero usar como</legend>
+            <label><input asp-for="UserType" type="radio" value="Paciente" checked /><span class="material-symbols-rounded">person</span><strong>Paciente</strong><small>Quero agendar consultas</small></label>
+            <label><input asp-for="UserType" type="radio" value="Profissional" /><span class="material-symbols-rounded">medical_services</span><strong>Profissional</strong><small>Quero atender pacientes</small></label>
+        </fieldset>
+        <span asp-validation-for="UserType" class="field-error"></span>
+        <div class="form-grid form-grid--two">
+            <div class="form-field form-field--full"><label asp-for="Email"></label><div class="input-wrap"><span class="material-symbols-rounded">mail</span><input asp-for="Email" autocomplete="email" placeholder="seuemail@exemplo.com" /></div><span asp-validation-for="Email" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="Password"></label><div class="input-wrap"><span class="material-symbols-rounded">lock</span><input asp-for="Password" autocomplete="new-password" /></div><span asp-validation-for="Password" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="ConfirmPassword"></label><div class="input-wrap"><span class="material-symbols-rounded">lock_reset</span><input asp-for="ConfirmPassword" autocomplete="new-password" /></div><span asp-validation-for="ConfirmPassword" class="field-error"></span></div>
+        </div>
+        <div data-patient-registration>
+            <div class="form-field"><label asp-for="BirthDate"></label><input asp-for="BirthDate" /><span asp-validation-for="BirthDate" class="field-error"></span><small>Usamos esta informação para aplicar as regras de consentimento por idade.</small></div>
+            <div class="guardian-fields" data-guardian-fields hidden>
+                <label class="check-field"><input asp-for="LegalGuardianConsent" /><span>Sou responsável legal pelo paciente</span></label>
+                <div class="form-field"><label asp-for="LegalGuardianName"></label><input asp-for="LegalGuardianName" /><span asp-validation-for="LegalGuardianName" class="field-error"></span></div>
+            </div>
+        </div>
+        <label class="check-field check-field--terms"><input asp-for="AcceptTerms" /><span>Li e aceito os <a href="#" data-open-terms>Termos de Uso e a Política de Privacidade</a>.</span></label>
+        <span asp-validation-for="AcceptTerms" class="field-error"></span>
+        <button type="submit" class="button button--primary button--full button--large">Criar conta <span class="material-symbols-rounded">arrow_forward</span></button>
+    </form>
+    <p class="auth-switch">Já possui conta? <a asp-action="Login">Entrar</a></p>
+</section>
+
+<dialog class="terms-dialog" data-terms-dialog>
+    <button type="button" class="dialog-close" data-close-dialog aria-label="Fechar">&times;</button>
+    <h2>Termos de Uso e Privacidade</h2>
+    <p>O AgendaiFisio utiliza seus dados para criar a conta, gerenciar o perfil e viabilizar seus agendamentos. Dados de saúde e cadastro devem ser informados somente pelo titular ou responsável legal.</p>
+    <p>Ao continuar, você declara que as informações fornecidas são verdadeiras e concorda com o tratamento necessário para a prestação do serviço de demonstração.</p>
+    <button type="button" class="button button--primary button--full" data-close-dialog>Entendi</button>
+</dialog>

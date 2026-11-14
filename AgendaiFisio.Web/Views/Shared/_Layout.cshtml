@@ -1,0 +1,103 @@
+@{
+    var authenticated = User.Identity?.IsAuthenticated == true;
+    var isPatient = User.IsInRole("Paciente");
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var userName = User.Identity?.Name;
+    var userInitial = string.IsNullOrWhiteSpace(userName) ? "U" : userName[..1].ToUpperInvariant();
+    string Active(string name) => controller.Equals(name, StringComparison.OrdinalIgnoreCase) ? "is-active" : string.Empty;
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0F766E" />
+    <title>@ViewData["Title"] — AgendaiFisio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="@(authenticated ? "app-body" : "public-body")">
+    @if (authenticated)
+    {
+        <div class="app-shell">
+            <aside class="side-nav" aria-label="Navegação principal">
+                <a asp-controller="Dashboard" asp-action="Index" class="brand brand--sidebar" aria-label="AgendaiFisio — início">
+                    <span class="brand-mark"><span class="material-symbols-rounded">calendar_month</span></span>
+                    <span>Agendai<span>Fisio</span></span>
+                </a>
+                <nav class="side-nav__links">
+                    <a asp-controller="Dashboard" asp-action="Index" class="nav-link @Active("Dashboard")"><span class="material-symbols-rounded">home</span><span>Início</span></a>
+                    <a asp-controller="Appointments" asp-action="Index" class="nav-link @Active("Appointments")"><span class="material-symbols-rounded">event_note</span><span>Agenda</span></a>
+                    @if (isPatient)
+                    {
+                        <a asp-controller="Professionals" asp-action="Index" class="nav-link @Active("Professionals")"><span class="material-symbols-rounded">medical_services</span><span>Profissionais</span></a>
+                        <a asp-controller="History" asp-action="Index" class="nav-link @Active("History")"><span class="material-symbols-rounded">history</span><span>Histórico</span></a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Availability" asp-action="Index" class="nav-link @Active("Availability")"><span class="material-symbols-rounded">edit_calendar</span><span>Disponibilidade</span></a>
+                        <a asp-controller="Patients" asp-action="Index" class="nav-link @Active("Patients")"><span class="material-symbols-rounded">group</span><span>Pacientes</span></a>
+                    }
+                    <a asp-controller="Profile" asp-action="Index" class="nav-link @Active("Profile")"><span class="material-symbols-rounded">person</span><span>Perfil</span></a>
+                </nav>
+                <div class="side-nav__account">
+                    <div class="account-chip">
+                        <span class="avatar avatar--small">@userInitial</span>
+                        <span><strong>@(isPatient ? "Paciente" : "Profissional")</strong><small>@(string.IsNullOrWhiteSpace(userName) ? "Conta AgendaiFisio" : userName)</small></span>
+                    </div>
+                    <form asp-controller="Account" asp-action="Logout" method="post">
+                        <button class="nav-link nav-link--button" type="submit"><span class="material-symbols-rounded">logout</span><span>Sair</span></button>
+                    </form>
+                </div>
+            </aside>
+
+            <div class="app-main">
+                <header class="mobile-header">
+                    <a asp-controller="Dashboard" asp-action="Index" class="brand"><span class="brand-mark"><span class="material-symbols-rounded">calendar_month</span></span><span>Agendai<span>Fisio</span></span></a>
+                    <a asp-controller="Profile" asp-action="Index" class="avatar avatar--small" aria-label="Abrir perfil">@userInitial</a>
+                </header>
+                <main class="page-content">
+                    <partial name="_FlashMessages" />
+                    @RenderBody()
+                </main>
+            </div>
+
+            <nav class="bottom-nav" aria-label="Navegação principal no celular">
+                <a asp-controller="Dashboard" asp-action="Index" class="@Active("Dashboard")"><span class="material-symbols-rounded">home</span><small>Início</small></a>
+                <a asp-controller="Appointments" asp-action="Index" class="@Active("Appointments")"><span class="material-symbols-rounded">event_note</span><small>Agenda</small></a>
+                @if (isPatient)
+                {
+                    <a asp-controller="Appointments" asp-action="Create" class="bottom-nav__primary"><span class="material-symbols-rounded">add</span><small>Agendar</small></a>
+                    <a asp-controller="History" asp-action="Index" class="@Active("History")"><span class="material-symbols-rounded">history</span><small>Histórico</small></a>
+                }
+                else
+                {
+                    <a asp-controller="Availability" asp-action="Index" class="@Active("Availability")"><span class="material-symbols-rounded">edit_calendar</span><small>Horários</small></a>
+                    <a asp-controller="Patients" asp-action="Index" class="@Active("Patients")"><span class="material-symbols-rounded">group</span><small>Pacientes</small></a>
+                }
+                <a asp-controller="Profile" asp-action="Index" class="@Active("Profile")"><span class="material-symbols-rounded">person</span><small>Perfil</small></a>
+            </nav>
+        </div>
+    }
+    else
+    {
+        <header class="public-header">
+            <a asp-controller="Home" asp-action="Index" class="brand"><span class="brand-mark"><span class="material-symbols-rounded">calendar_month</span></span><span>Agendai<span>Fisio</span></span></a>
+            <nav aria-label="Navegação pública">
+                <a asp-controller="Home" asp-action="Index" asp-fragment="especialidades">Especialidades</a>
+                <a asp-controller="Account" asp-action="Login" class="button button--ghost button--small">Entrar</a>
+                <a asp-controller="Account" asp-action="Register" class="button button--primary button--small">Criar conta</a>
+            </nav>
+        </header>
+        <main>
+            <partial name="_FlashMessages" />
+            @RenderBody()
+        </main>
+    }
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

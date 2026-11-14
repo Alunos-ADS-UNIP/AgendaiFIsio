@@ -1,0 +1,17 @@
+@model ProfissionalDetailDTO
+@{
+    ViewData["Title"] = Model.NomeCompleto;
+    var initials = string.Join("", Model.NomeCompleto.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
+}
+<a asp-action="Index" class="back-link"><span class="material-symbols-rounded">arrow_back</span> Voltar aos profissionais</a>
+<section class="profile-hero-card">
+    @if (!string.IsNullOrWhiteSpace(Model.FotoPerfilUrl)) { <img class="profile-photo" src="@Model.FotoPerfilUrl" alt="Foto de @Model.NomeCompleto" /> } else { <span class="avatar avatar--xlarge">@initials</span> }
+    <div class="profile-hero-card__info"><span class="status-dot"><i></i> Atendendo pelo AgendaiFisio</span><h1>@Model.NomeCompleto</h1><p class="profile-specialty">@(Model.Especialidade?.Nome ?? "Fisioterapia")</p><p>CREFITO @Model.Crefito</p></div>
+    <a asp-controller="Appointments" asp-action="Create" asp-route-professionalId="@Model.Id" class="button button--primary button--large">Agendar consulta</a>
+</section>
+<div class="details-grid">
+    <section class="panel"><div class="panel__heading"><span class="icon-tile"><span class="material-symbols-rounded">person</span></span><div><h2>Sobre o profissional</h2><p>Conheça sua experiência e forma de atendimento.</p></div></div><p class="bio-text">@(string.IsNullOrWhiteSpace(Model.Bio) ? "Este profissional ainda não cadastrou uma descrição." : Model.Bio)</p></section>
+    <section class="panel"><div class="panel__heading"><span class="icon-tile icon-tile--blue"><span class="material-symbols-rounded">location_on</span></span><div><h2>Local de atendimento</h2><p>Endereço informado pelo profissional.</p></div></div>@if (Model.Endereco is null) { <p class="muted">Endereço ainda não informado.</p> } else { <address><strong>@Model.Endereco.Rua, @Model.Endereco.Numero</strong>@if (!string.IsNullOrWhiteSpace(Model.Endereco.Complemento)) { <span>@Model.Endereco.Complemento</span> }<span>@Model.Endereco.Bairro</span><span>@Model.Endereco.Cidade - @Model.Endereco.Estado</span><span>CEP @Model.Endereco.Cep</span></address> }</section>
+    <section class="panel"><div class="panel__heading"><span class="icon-tile icon-tile--amber"><span class="material-symbols-rounded">contact_mail</span></span><div><h2>Contato</h2><p>Use estes dados quando necessário.</p></div></div><dl class="info-list"><div><dt>E-mail</dt><dd>@Model.Email</dd></div><div><dt>Telefone</dt><dd>@Model.Telefone</dd></div></dl></section>
+</div>
+<div class="mobile-sticky-action"><a asp-controller="Appointments" asp-action="Create" asp-route-professionalId="@Model.Id" class="button button--primary button--full">Agendar consulta</a></div>

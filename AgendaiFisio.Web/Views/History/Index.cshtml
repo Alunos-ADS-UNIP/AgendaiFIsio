@@ -1,0 +1,33 @@
+@model HistoryViewModel
+@{
+    ViewData["Title"] = "Histórico de consultas";
+}
+<header class="page-heading"><div><span class="eyebrow">Sua jornada</span><h1>Histórico de consultas</h1><p>Consulte os atendimentos anteriores e cancelamentos preservados.</p></div></header>
+@if (Model.History.Itens.Count == 0)
+{
+    <section class="state-card state-card--center"><span class="material-symbols-rounded state-card__icon">history</span><h2>Seu histórico está vazio</h2><p>Depois do primeiro atendimento, ele aparecerá aqui.</p><a asp-controller="Appointments" asp-action="Create" class="button button--primary">Agendar consulta</a></section>
+}
+else
+{
+    <div class="history-list">
+        @foreach (var item in Model.History.Itens)
+        {
+            var local = BrazilTime.ToLocal(item.DataHora);
+            <a asp-controller="Appointments" asp-action="Details" asp-route-id="@item.AgendamentoId" class="history-item">
+                <span class="icon-tile"><span class="material-symbols-rounded">medical_services</span></span>
+                <div><h2>@item.ProfissionalNome</h2><p>@local.ToString("dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")) às @local.ToString("HH:mm")</p></div>
+                <span class="status-pill status-pill--@item.Status.ToLowerInvariant()">@item.Status</span>
+                <span class="material-symbols-rounded">chevron_right</span>
+            </a>
+        }
+    </div>
+    @if (Model.History.TotalPaginas > 1)
+    {
+        <nav class="pagination" aria-label="Páginas do histórico">
+            @for (var pageNumber = 1; pageNumber <= Model.History.TotalPaginas; pageNumber++)
+            {
+                <a asp-action="Index" asp-route-page="@pageNumber" class="@(pageNumber == Model.Page ? "is-current" : "")">@pageNumber</a>
+            }
+        </nav>
+    }
+}

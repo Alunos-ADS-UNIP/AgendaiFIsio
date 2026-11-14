@@ -1,0 +1,77 @@
+@model AvailabilityViewModel
+@{
+    ViewData["Title"] = "Disponibilidade";
+    var orderedBlocks = Model.Blocks.OrderBy(block => block.Inicio).ToList();
+}
+
+<header class="page-heading">
+    <div>
+        <span class="eyebrow">Organize seus atendimentos</span>
+        <h1>Disponibilidade</h1>
+        <p>Bloqueie dias ou horários em que você não poderá receber pacientes.</p>
+    </div>
+</header>
+
+<div class="availability-grid">
+    <section class="panel form-panel">
+        <div class="panel__heading">
+            <span class="icon-tile"><span class="material-symbols-rounded">event_busy</span></span>
+            <div><h2>Bloquear um dia</h2><p>Impede novos agendamentos durante todo o dia.</p></div>
+        </div>
+        <form asp-action="BlockDay" method="post" class="form-stack">
+            <div class="form-field"><label asp-for="Day">Data</label><input asp-for="Day" min="@DateTime.Today.ToString("yyyy-MM-dd")" /></div>
+            <div class="form-field"><label asp-for="Reason">Motivo (opcional)</label><input asp-for="Reason" placeholder="Ex.: congresso ou folga" /></div>
+            <button type="submit" class="button button--primary button--full">Bloquear dia</button>
+        </form>
+    </section>
+
+    <section class="panel form-panel">
+        <div class="panel__heading">
+            <span class="icon-tile icon-tile--blue"><span class="material-symbols-rounded">schedule</span></span>
+            <div><h2>Bloquear um horário</h2><p>Reserva apenas o horário selecionado na agenda.</p></div>
+        </div>
+        <form asp-action="BlockTime" method="post" class="form-stack">
+            <div class="form-field"><label asp-for="LocalDateTime">Data e horário</label><input asp-for="LocalDateTime" type="datetime-local" step="3600" min="@DateTime.Now.ToString("yyyy-MM-ddTHH:00")" /></div>
+            <div class="form-field"><label asp-for="Reason">Motivo (opcional)</label><input asp-for="Reason" placeholder="Ex.: compromisso pessoal" /></div>
+            <button type="submit" class="button button--primary button--full">Bloquear horário</button>
+        </form>
+    </section>
+</div>
+
+<section class="content-section">
+    <div class="section-heading">
+        <div><h2>Próximos bloqueios</h2><p>Períodos indisponíveis nos próximos três meses.</p></div>
+        <span class="count-badge">@orderedBlocks.Count</span>
+    </div>
+
+    @if (orderedBlocks.Count == 0)
+    {
+        <div class="empty-card">
+            <span class="material-symbols-rounded">event_available</span>
+            <div><h3>Sua agenda está livre</h3><p>Não há bloqueios cadastrados para este período.</p></div>
+        </div>
+    }
+    else
+    {
+        <div class="block-list">
+            @foreach (var block in orderedBlocks)
+            {
+                var start = BrazilTime.ToLocal(block.Inicio);
+                var end = BrazilTime.ToLocal(block.Fim);
+                var isDay = block.Tipo.Equals("Dia", StringComparison.OrdinalIgnoreCase);
+                <article class="block-card">
+                    <span class="date-badge"><strong>@start.ToString("dd")</strong><small>@start.ToString("MMM", new System.Globalization.CultureInfo("pt-BR")).ToUpperInvariant()</small></span>
+                    <div class="block-card__body">
+                        <span class="status-pill">@(isDay ? "Dia inteiro" : "Horário")</span>
+                        <h3>@(isDay ? start.ToString("dddd, dd 'de' MMMM", new System.Globalization.CultureInfo("pt-BR")) : $"{start:dd/MM/yyyy} às {start:HH:mm}")</h3>
+                        <p>@(string.IsNullOrWhiteSpace(block.Motivo) ? "Sem motivo informado" : block.Motivo)</p>
+                        @if (!isDay) { <small>Término previsto: @end.ToString("HH:mm")</small> }
+                    </div>
+                    <form asp-action="Delete" asp-route-id="@block.Id" method="post" data-confirm="Remover este bloqueio e liberar o período para agendamentos?">
+                        <button class="icon-button icon-button--danger" type="submit" aria-label="Remover bloqueio"><span class="material-symbols-rounded">delete</span></button>
+                    </form>
+                </article>
+            }
+        </div>
+    }
+</section>
