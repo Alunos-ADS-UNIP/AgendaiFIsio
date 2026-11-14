@@ -18,8 +18,6 @@ namespace AgendaiFisio.Context
         public DbSet<Usuario> Usuarios { get; set; }
         public DbSet<Paciente> Pacientes { get; set; }
         public DbSet<Profissional> Profissionais { get; set; }
-        public DbSet<AvaliacaoFisioterapeuta> AvaliacaoFisioterapeuta { get; set; }
-        public DbSet<PlanoTerapeutico> PlanosTerapeutico { get; set; }
         public DbSet<Endereco> Enderecos { get; set; }
         public DbSet<Especialidade> Especialidades { get; set; }
         public DbSet<Agendamento> Agendamentos { get; set; }
@@ -32,16 +30,18 @@ namespace AgendaiFisio.Context
             // Define as relações e regras das tabelas.
             base.OnModelCreating(modelBuilder);
 
-            // Liga uma avaliação a um único plano terapêutico.
-            modelBuilder.Entity<AvaliacaoFisioterapeuta>()
-                .HasOne(a => a.Plano)
-                .WithOne(p => p.AvaliacaoFisioterapeuta)
-                .HasForeignKey<PlanoTerapeutico>(p => p.AvaliacaoFisioterapeutaId);
-
             // Impede dois usuários com o mesmo e-mail.
             modelBuilder.Entity<Usuario>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+            modelBuilder.Entity<Usuario>()
+                .Property(u => u.VersaoTermos)
+                .HasMaxLength(20);
+            modelBuilder.Entity<Usuario>()
+                .Property(u => u.NomeResponsavelLegal)
+                .HasMaxLength(150);
+            modelBuilder.Entity<Usuario>()
+                .HasIndex(u => u.DadosExpiramEmUtc);
 
             // Datas de nascimento não representam um instante nem um fuso horário.
             modelBuilder.Entity<Paciente>()
@@ -92,20 +92,6 @@ namespace AgendaiFisio.Context
                 .HasOne(p => p.Endereco)
                 .WithOne()
                 .HasForeignKey<Profissional>(p => p.EnderecoId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // Evita apagar avaliações junto com o profissional.
-            modelBuilder.Entity<AvaliacaoFisioterapeuta>()
-                .HasOne(a => a.Profissional)
-                .WithMany()
-                .HasForeignKey(a => a.ProfissionalId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // Evita apagar avaliações junto com o paciente.
-            modelBuilder.Entity<AvaliacaoFisioterapeuta>()
-                .HasOne(a => a.Paciente)
-                .WithMany()
-                .HasForeignKey(a => a.PacienteId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Mantém o histórico de agendamentos mesmo quando há relações no domínio.

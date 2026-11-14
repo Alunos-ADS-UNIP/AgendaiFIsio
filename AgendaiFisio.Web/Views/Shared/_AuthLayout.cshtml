@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0F766E" />
+    <title>@ViewData["Title"] — AgendaiFisio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="auth-body">
+    <main class="auth-shell">
+        <a asp-controller="Home" asp-action="Index" class="auth-brand" aria-label="Voltar para o site">
+            <span class="brand brand--light"><span class="brand-mark brand-mark--light"><span class="material-symbols-rounded">calendar_month</span></span><span>Agendai<span>Fisio</span></span></span>
+            <small>Seu cuidado, no seu tempo.</small>
+        </a>
+        <partial name="_FlashMessages" />
+        @RenderBody()
+        <p class="security-note"><span class="material-symbols-rounded">lock</span> Seus dados são enviados com conexão segura.</p>
+    </main>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

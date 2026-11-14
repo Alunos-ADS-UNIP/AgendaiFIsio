@@ -1,0 +1,8 @@
+@model PatientDirectoryViewModel
+@{
+    ViewData["Title"] = "Pacientes";
+}
+<header class="page-heading"><div><span class="eyebrow">Área profissional</span><h1>Pacientes</h1><p>Busque por nome ou CPF para consultar cadastro e histórico autorizado.</p></div></header>
+<form method="get" class="filter-bar"><div class="input-wrap"><span class="material-symbols-rounded">search</span><input type="search" name="search" value="@Model.Search" placeholder="Nome ou CPF" /></div><button type="submit" class="button button--primary">Buscar</button>@if (!string.IsNullOrWhiteSpace(Model.Search)) { <a asp-action="Index" class="button button--ghost">Limpar</a> }</form>
+@if (Model.Results.Itens.Count == 0) { <section class="state-card state-card--center"><span class="material-symbols-rounded state-card__icon">person_search</span><h2>Nenhum paciente encontrado</h2><p>A busca mostra apenas pacientes disponíveis para consulta pelo seu perfil.</p></section> }
+else { <div class="patient-grid">@foreach (var patient in Model.Results.Itens) { <a asp-action="Details" asp-route-id="@patient.Id" class="patient-card"><span class="avatar">@(string.IsNullOrWhiteSpace(patient.NomeCompleto) ? "P" : patient.NomeCompleto[0].ToString().ToUpperInvariant())</span><div><h2>@patient.NomeCompleto</h2><p>@patient.CpfMascarado</p><small>@patient.Email</small></div><span class="material-symbols-rounded">chevron_right</span></a> }</div> }

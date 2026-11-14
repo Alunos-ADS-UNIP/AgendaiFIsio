@@ -1,0 +1,12 @@
+@model RescheduleViewModel
+@{
+    ViewData["Title"] = "Reagendar consulta";
+}
+<a asp-action="Details" asp-route-id="@Model.AppointmentId" class="back-link"><span class="material-symbols-rounded">arrow_back</span> Voltar aos detalhes</a>
+<header class="page-heading"><div><span class="eyebrow">Alterar horário</span><h1>Reagendar consulta</h1><p>Escolha uma nova data e um horário em hora cheia.</p></div></header>
+<form asp-action="Reschedule" asp-route-id="@Model.AppointmentId" method="post" class="panel form-panel form-panel--narrow">
+    <input asp-for="AppointmentId" type="hidden" />
+    <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+    <div class="form-field"><label asp-for="LocalDateTime"></label><input asp-for="LocalDateTime" type="datetime-local" step="3600" /><span asp-validation-for="LocalDateTime" class="field-error"></span><small>O backend confirmará se o novo horário continua disponível.</small></div>
+    <div class="form-actions"><a asp-action="Details" asp-route-id="@Model.AppointmentId" class="button button--ghost">Cancelar</a><button type="submit" class="button button--primary">Salvar novo horário</button></div>
+</form>

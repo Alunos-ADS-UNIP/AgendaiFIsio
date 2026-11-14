@@ -15,6 +15,7 @@ namespace AgendaiFisio.Services.Profissional
     public class ProfissionalService : IProfissionalService
     {
         private readonly IProfissionalRepositorio _profissionais;
+        private readonly IEnderecoRepositorio _enderecos;
         private readonly IEspecialidadeRepositorio _especialidades;
         private readonly IBloqueioAgendaRepositorio _bloqueios;
         private readonly IAgendamentoRepositorio _agendamentos;
@@ -24,6 +25,7 @@ namespace AgendaiFisio.Services.Profissional
 
         public ProfissionalService(
             IProfissionalRepositorio profissionais,
+            IEnderecoRepositorio enderecos,
             IEspecialidadeRepositorio especialidades,
             IBloqueioAgendaRepositorio bloqueios,
             IAgendamentoRepositorio agendamentos,
@@ -32,6 +34,7 @@ namespace AgendaiFisio.Services.Profissional
             ILogger<ProfissionalService> logger)
         {
             _profissionais = profissionais;
+            _enderecos = enderecos;
             _especialidades = especialidades;
             _bloqueios = bloqueios;
             _agendamentos = agendamentos;
@@ -259,7 +262,16 @@ namespace AgendaiFisio.Services.Profissional
             profissional.DataNascimento = dto.DataNascimento;
             profissional.Bio = dto.Bio?.Trim() ?? string.Empty;
             profissional.Ativo = dto.Ativo;
-            profissional.Endereco ??= new Entities.Endereco();
+            if (profissional.Endereco is null)
+            {
+                // Cadastros anteriores à funcionalidade de endereço possuem EnderecoId nulo.
+                // Como Endereco gera o Guid no construtor, apenas atribuir a navegação em uma
+                // entidade já rastreada faz o EF interpretá-lo como Modified. Registrá-lo como
+                // Added garante o INSERT antes de atualizar a FK do profissional.
+                profissional.Endereco = new Entities.Endereco();
+                _enderecos.Adicionar(profissional.Endereco);
+            }
+
             profissional.Endereco.Rua = dto.Rua.Trim();
             profissional.Endereco.Numero = dto.Numero.Trim();
             profissional.Endereco.Complemento = dto.Complemento?.Trim() ?? string.Empty;

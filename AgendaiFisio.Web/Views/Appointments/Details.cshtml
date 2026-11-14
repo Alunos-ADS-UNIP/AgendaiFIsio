@@ -1,0 +1,27 @@
+@model AgendamentoResponseDTO
+@{
+    ViewData["Title"] = "Detalhes da consulta";
+    var local = BrazilTime.ToLocal(Model.DataHora);
+    var role = User.IsInRole("Profissional") ? "Profissional" : "Paciente";
+    var person = role == "Profissional" ? Model.PacienteNome : Model.ProfissionalNome;
+    var actionable = Model.DataHora > DateTime.UtcNow &&
+        !Model.Status.Equals("Cancelado", StringComparison.OrdinalIgnoreCase) &&
+        !Model.Status.Equals("Concluido", StringComparison.OrdinalIgnoreCase) &&
+        !Model.Status.Equals("Concluído", StringComparison.OrdinalIgnoreCase);
+}
+<a asp-action="Index" class="back-link"><span class="material-symbols-rounded">arrow_back</span> Voltar para a agenda</a>
+<header class="page-heading"><div><span class="eyebrow">Consulta</span><h1>Detalhes do atendimento</h1><p>Confira data, horário e informações relacionadas.</p></div><span class="status-pill status-pill--large status-pill--@Model.Status.ToLowerInvariant()">@Model.Status</span></header>
+
+<div class="details-grid details-grid--appointment">
+    <section class="panel appointment-overview">
+        <div class="appointment-date-large"><span>@local.ToString("MMM", new System.Globalization.CultureInfo("pt-BR")).ToUpperInvariant()</span><strong>@local.Day.ToString("00")</strong><small>@local.Year</small></div>
+        <div><span class="eyebrow">Data e horário</span><h2>@local.ToString("dddd", new System.Globalization.CultureInfo("pt-BR")) às @local.ToString("HH:mm")</h2><p>A consulta tem duração prevista de 1 hora.</p></div>
+    </section>
+    <section class="panel"><div class="panel__heading"><span class="avatar">@((string.IsNullOrWhiteSpace(person) ? "P" : person[0].ToString()).ToUpperInvariant())</span><div><span class="eyebrow">@(role == "Profissional" ? "Paciente" : "Fisioterapeuta")</span><h2>@(string.IsNullOrWhiteSpace(person) ? "Não informado" : person)</h2><p>Fisioterapia</p></div></div></section>
+    <section class="panel"><div class="panel__heading"><span class="icon-tile"><span class="material-symbols-rounded">notes</span></span><div><h2>Observações</h2><p>Informações fornecidas no agendamento.</p></div></div><p class="bio-text">@(string.IsNullOrWhiteSpace(Model.Observacoes) ? "Nenhuma observação cadastrada." : Model.Observacoes)</p></section>
+</div>
+
+@if (actionable)
+{
+    <section class="action-panel"><div><h2>Precisa alterar esta consulta?</h2><p>Você pode escolher outro horário ou cancelar o agendamento.</p></div><div><a asp-action="Reschedule" asp-route-id="@Model.Id" class="button button--outline"><span class="material-symbols-rounded">edit_calendar</span> Reagendar</a><form asp-action="Cancel" asp-route-id="@Model.Id" method="post" data-confirm="Cancelar esta consulta? O registro continuará no histórico."><button class="button button--danger" type="submit"><span class="material-symbols-rounded">event_busy</span> Cancelar</button></form></div></section>
+}

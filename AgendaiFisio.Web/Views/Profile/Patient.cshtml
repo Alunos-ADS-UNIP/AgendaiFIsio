@@ -1,0 +1,35 @@
+@model PatientProfileViewModel
+@{
+    ViewData["Title"] = "Meu perfil";
+    var pending = string.IsNullOrWhiteSpace(Model.FullName);
+}
+<header class="page-heading"><div><span class="eyebrow">Área do paciente</span><h1>@(pending ? "Complete seu perfil" : "Meu perfil")</h1><p>@(pending ? "Preencha seus dados antes de realizar o primeiro agendamento." : "Mantenha seus dados pessoais e endereço atualizados.")</p></div></header>
+@if (pending) { <div class="inline-alert inline-alert--warning"><span class="material-symbols-rounded">info</span><span>Seu cadastro ainda está incompleto. Todos os campos obrigatórios precisam ser preenchidos.</span></div> }
+<form asp-action="UpdatePatient" method="post" class="profile-form" data-address-form>
+    <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+    <section class="panel form-panel">
+        <div class="panel__heading"><span class="icon-tile"><span class="material-symbols-rounded">person</span></span><div><h2>Dados pessoais</h2><p>Informações usadas para identificar seu cadastro.</p></div></div>
+        <div class="form-grid form-grid--two">
+            <div class="form-field form-field--full"><label asp-for="FullName"></label><input asp-for="FullName" autocomplete="name" /><span asp-validation-for="FullName" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="Email"></label><input asp-for="Email" type="email" readonly class="input-readonly" /></div>
+            <div class="form-field"><label asp-for="Cpf"></label><input asp-for="Cpf" inputmode="numeric" data-mask="cpf" /><span asp-validation-for="Cpf" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="Phone"></label><input asp-for="Phone" inputmode="tel" data-mask="phone" /><span asp-validation-for="Phone" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="BirthDate"></label><input asp-for="BirthDate" /><span asp-validation-for="BirthDate" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="Gender"></label><select asp-for="Gender"><option value="">Selecione</option><option>Feminino</option><option>Masculino</option><option>Outro</option></select></div>
+            <div class="form-field"><label asp-for="MaritalStatus"></label><select asp-for="MaritalStatus"><option value="">Selecione</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select></div>
+        </div>
+    </section>
+    <section class="panel form-panel">
+        <div class="panel__heading"><span class="icon-tile icon-tile--blue"><span class="material-symbols-rounded">home_pin</span></span><div><h2>Endereço</h2><p>Usado para manter seu cadastro completo.</p></div></div>
+        <div class="form-grid form-grid--address">
+            <div class="form-field"><label asp-for="ZipCode"></label><div class="input-wrap"><input asp-for="ZipCode" inputmode="numeric" data-cep-input data-mask="cep" /><span class="input-spinner" data-cep-spinner hidden></span></div><span asp-validation-for="ZipCode" class="field-error"></span><small data-cep-feedback></small></div>
+            <div class="form-field form-field--street"><label asp-for="Street"></label><input asp-for="Street" data-address-street /><span asp-validation-for="Street" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="Number"></label><input asp-for="Number" /><span asp-validation-for="Number" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="Complement"></label><input asp-for="Complement" /></div>
+            <div class="form-field"><label asp-for="Neighborhood"></label><input asp-for="Neighborhood" data-address-neighborhood /><span asp-validation-for="Neighborhood" class="field-error"></span></div>
+            <div class="form-field"><label asp-for="City"></label><input asp-for="City" data-address-city /><span asp-validation-for="City" class="field-error"></span></div>
+            <div class="form-field form-field--state"><label asp-for="State"></label><input asp-for="State" maxlength="2" data-address-state /><span asp-validation-for="State" class="field-error"></span></div>
+        </div>
+    </section>
+    <div class="sticky-form-actions"><button type="submit" class="button button--primary button--large"><span class="material-symbols-rounded">check</span> Salvar perfil</button></div>
+</form>

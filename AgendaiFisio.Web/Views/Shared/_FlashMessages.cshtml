@@ -1,0 +1,8 @@
+@if (TempData["Success"] is string success)
+{
+    <div class="flash flash--success" role="status"><span class="material-symbols-rounded">check_circle</span><span>@success</span><button type="button" aria-label="Fechar mensagem" data-dismiss-flash>&times;</button></div>
+}
+@if (TempData["Error"] is string error)
+{
+    <div class="flash flash--error" role="alert"><span class="material-symbols-rounded">error</span><span>@error</span><button type="button" aria-label="Fechar mensagem" data-dismiss-flash>&times;</button></div>
+}

@@ -16,3 +16,7 @@ appsettings.*.local.json
 .env.neon
 .neon
 *.publishSettings
+
+# Gerado pela carga de demonstração; contém senhas de contas fictícias.
+output/credenciais-terapeutas.csv
+Tools/DemoDataSeeder/connection-string.local.txt

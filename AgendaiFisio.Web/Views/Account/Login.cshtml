@@ -1,0 +1,22 @@
+@model LoginViewModel
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Entrar";
+}
+<section class="auth-card">
+    <div class="auth-card__heading"><h1>Boas-vindas</h1><p>Entre para gerenciar seus atendimentos.</p></div>
+    @if (ViewData["SessionExpired"] is true)
+    {
+        <div class="inline-alert inline-alert--warning"><span class="material-symbols-rounded">schedule</span><span>Sua sessão expirou. Entre novamente para continuar.</span></div>
+    }
+    <form asp-action="Login" method="post" class="form-stack">
+        <input asp-for="ReturnUrl" type="hidden" />
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+        <div class="form-field"><label asp-for="Email"></label><div class="input-wrap"><span class="material-symbols-rounded">mail</span><input asp-for="Email" autocomplete="email" placeholder="seuemail@exemplo.com" autofocus /></div><span asp-validation-for="Email" class="field-error"></span></div>
+        <div class="form-field"><label asp-for="Password"></label><div class="input-wrap"><span class="material-symbols-rounded">lock</span><input asp-for="Password" autocomplete="current-password" data-password-input /><button type="button" class="icon-button" data-toggle-password aria-label="Mostrar senha"><span class="material-symbols-rounded">visibility</span></button></div><span asp-validation-for="Password" class="field-error"></span></div>
+        <button type="submit" class="button button--primary button--full button--large"><span class="material-symbols-rounded">login</span> Entrar</button>
+    </form>
+    <p class="auth-switch">Ainda não tem conta? <a asp-action="Register">Criar conta</a></p>
+    <div class="auth-divider"><span>ou explore primeiro</span></div>
+    <a asp-controller="Home" asp-action="Index" asp-fragment="especialidades" class="button button--ghost button--full">Ver especialidades</a>
+</section>

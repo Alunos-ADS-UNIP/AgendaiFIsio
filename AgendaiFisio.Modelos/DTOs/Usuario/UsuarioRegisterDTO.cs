@@ -23,5 +23,14 @@ namespace AgendaiFisio.DTOs.Usuario
 
         [AgendaiFisio.Validations.AceiteLgpdObrigatorio]
         public bool AceiteLgpd { get; set; }
+
+        // Obrigatória para pacientes, pois a API precisa aplicar a regra etária
+        // antes de criar a conta. Profissionais informam a data ao completar o perfil.
+        public DateTime? DataNascimento { get; set; }
+
+        public bool ConsentimentoResponsavelLegal { get; set; }
+
+        [MaxLength(150, ErrorMessage = "O nome do responsável deve ter no máximo 150 caracteres.")]
+        public string? NomeResponsavelLegal { get; set; }
     }
 }

@@ -50,6 +50,37 @@ namespace AgendaiFisio.Services.Auth
             var tipoUsuario = AgendaiFisio.Constants.PerfilDeUsuario.NormalizarCadastro(registroDto.TipoUsuario)
                 ?? throw new ArgumentException("Tipo de usuario invalido. Use Paciente ou Profissional.");
 
+            var agoraUtc = DateTime.UtcNow;
+            DateTime? dataNascimentoPaciente = null;
+            var consentimentoResponsavel = false;
+            string? nomeResponsavel = null;
+
+            if (tipoUsuario == PerfilDeUsuario.Paciente)
+            {
+                if (registroDto.DataNascimento is null)
+                    throw new ArgumentException("A data de nascimento é obrigatória para o cadastro de paciente.");
+
+                dataNascimentoPaciente = registroDto.DataNascimento.Value.Date;
+                var idade = PoliticaDadosDemonstracao.CalcularIdade(
+                    dataNascimentoPaciente.Value,
+                    agoraUtc);
+
+                if (idade < 0 || idade > 130)
+                    throw new ArgumentException("A data de nascimento informada é inválida.");
+
+                if (idade < PoliticaDadosDemonstracao.IdadeConsentimentoResponsavel)
+                {
+                    nomeResponsavel = registroDto.NomeResponsavelLegal?.Trim();
+                    if (!registroDto.ConsentimentoResponsavelLegal || string.IsNullOrWhiteSpace(nomeResponsavel))
+                    {
+                        throw new ArgumentException(
+                            "Pacientes menores de 16 anos precisam da autorização de um responsável legal identificado.");
+                    }
+
+                    consentimentoResponsavel = true;
+                }
+            }
+
             // Procura uma conta já cadastrada com o mesmo e-mail.
             var usuarioExistente = await _usuarios.Consultar()
                 .FirstOrDefaultAsync(u => u.Email == registroDto.Email);
@@ -64,7 +95,12 @@ namespace AgendaiFisio.Services.Auth
                 SenhaHash = BCrypt.Net.BCrypt.HashPassword(registroDto.Senha),
                 TipoUsuario = tipoUsuario,
                 AceiteLgpd = true,
-                AceiteLgpdEm = DateTime.UtcNow
+                AceiteLgpdEm = agoraUtc,
+                VersaoTermos = PoliticaDadosDemonstracao.VersaoTermosAtual,
+                DadosExpiramEmUtc = agoraUtc.AddDays(PoliticaDadosDemonstracao.PrazoRetencaoDias),
+                ConsentimentoResponsavelLegal = consentimentoResponsavel,
+                NomeResponsavelLegal = nomeResponsavel,
+                ConsentimentoResponsavelLegalEm = consentimentoResponsavel ? agoraUtc : null
             };
 
             _usuarios.Adicionar(novoUsuario);
@@ -78,6 +114,7 @@ namespace AgendaiFisio.Services.Auth
                     NomeCompleto = "Cadastro Pendente",
                     Cpf = string.Empty,
                     Telefone = string.Empty,
+                    DataNascimento = dataNascimentoPaciente!.Value,
                     Sexo = string.Empty,
                     EstadoCivil = string.Empty,
                     Endereco = new Entities.Endereco()
@@ -141,6 +178,12 @@ namespace AgendaiFisio.Services.Auth
                 throw new UnauthorizedAccessException("E-mail ou senha inválidos.");
             }
 
+            if (usuario.DadosExpiramEmUtc != default && usuario.DadosExpiramEmUtc <= DateTime.UtcNow)
+            {
+                throw new UnauthorizedAccessException(
+                    "Os dados desta conta demonstrativa expiraram após 90 dias e serão removidos.");
+            }
+
             var tipoUsuario = PerfilDeUsuario.NormalizarAutenticado(usuario.TipoUsuario)
                 ?? throw new UnauthorizedAccessException("Perfil de usuário não permitido neste aplicativo.");
 
@@ -169,6 +212,8 @@ namespace AgendaiFisio.Services.Auth
             var key = Encoding.ASCII.GetBytes(secretKey!);
             var expiraEmUtc = DateTime.UtcNow.AddHours(
                 jwtSettings.GetValue<double>("ExpirationHours"));
+            if (usuario.DadosExpiramEmUtc != default && usuario.DadosExpiramEmUtc < expiraEmUtc)
+                expiraEmUtc = usuario.DadosExpiramEmUtc;
 
             var claims = new List<Claim>
             {

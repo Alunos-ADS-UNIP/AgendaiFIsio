@@ -1,0 +1,68 @@
+@model HomeViewModel
+@{
+    ViewData["Title"] = "Fisioterapia no seu tempo";
+}
+
+<section class="hero">
+    <div class="hero__content">
+        <span class="eyebrow"><span class="material-symbols-rounded">health_and_safety</span> Cuidado simples e acessível</span>
+        <h1>Seu cuidado,<br /><span>no seu tempo.</span></h1>
+        <p>Encontre fisioterapeutas, escolha o melhor horário e acompanhe seus atendimentos em um só lugar.</p>
+        <div class="hero__actions">
+            <a asp-controller="Account" asp-action="Register" class="button button--primary button--large">Começar agora <span class="material-symbols-rounded">arrow_forward</span></a>
+            <a asp-controller="Account" asp-action="Login" class="button button--outline button--large">Já tenho uma conta</a>
+        </div>
+        <div class="hero__trust">
+            <span><span class="material-symbols-rounded">verified_user</span> Dados protegidos</span>
+            <span><span class="material-symbols-rounded">schedule</span> Agenda em tempo real</span>
+        </div>
+    </div>
+    <div class="hero__visual" aria-label="Prévia da área do paciente">
+        <div class="phone-preview">
+            <div class="phone-preview__header"><span>AgendaiFisio</span><span class="avatar avatar--tiny">M</span></div>
+            <div class="phone-preview__body">
+                <p>Olá, Marina!</p>
+                <h3>Como podemos cuidar de você hoje?</h3>
+                <div class="today-card"><span class="material-symbols-rounded">calendar_today</span><div><strong>Hoje</strong><small>Você não tem consultas</small></div><b>0</b></div>
+                <div class="preview-callout"><span class="material-symbols-rounded">add_circle</span><div><strong>Agende sua consulta</strong><small>Escolha especialidade, profissional e horário.</small></div></div>
+                <h4>Profissional em destaque</h4>
+                <div class="preview-professional"><span class="avatar">AS</span><div><strong>Ana Souza</strong><small>Fisioterapia esportiva</small></div><span class="material-symbols-rounded">chevron_right</span></div>
+            </div>
+        </div>
+        <span class="hero-orb hero-orb--one"></span><span class="hero-orb hero-orb--two"></span>
+    </div>
+</section>
+
+<section class="feature-strip" aria-label="Benefícios">
+    <article><span class="icon-tile"><span class="material-symbols-rounded">search</span></span><div><h3>Encontre profissionais</h3><p>Conheça especialidades e escolha quem combina com seu cuidado.</p></div></article>
+    <article><span class="icon-tile icon-tile--blue"><span class="material-symbols-rounded">event_available</span></span><div><h3>Agende com facilidade</h3><p>Consulte horários disponíveis e marque em poucos passos.</p></div></article>
+    <article><span class="icon-tile icon-tile--amber"><span class="material-symbols-rounded">notifications_active</span></span><div><h3>Acompanhe sua agenda</h3><p>Reagende ou cancele mantendo seu histórico organizado.</p></div></article>
+</section>
+
+<section class="section section--soft" id="especialidades">
+    <div class="section-heading section-heading--center">
+        <span class="eyebrow">Especialidades</span>
+        <h2>Cuidado para cada momento</h2>
+        <p>O catálogo usado no site é o mesmo disponível no aplicativo.</p>
+    </div>
+    @if (Model.Specialties.Count > 0)
+    {
+        <div class="specialty-grid">
+            @foreach (var specialty in Model.Specialties)
+            {
+                <article class="specialty-card"><span class="icon-tile"><span class="material-symbols-rounded">spa</span></span><h3>@specialty.Nome</h3><p>Profissionais preparados para acompanhar sua evolução.</p></article>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="inline-state"><span class="material-symbols-rounded">cloud_off</span> O catálogo está temporariamente indisponível.</div>
+    }
+</section>
+
+<section class="cta-banner">
+    <div><span class="eyebrow eyebrow--light">AgendaiFisio</span><h2>Pronto para cuidar de você?</h2><p>Crie sua conta gratuitamente e encontre o atendimento ideal.</p></div>
+    <a asp-controller="Account" asp-action="Register" class="button button--light button--large">Criar minha conta <span class="material-symbols-rounded">arrow_forward</span></a>
+</section>
+
+<footer class="public-footer"><span class="brand"><span class="brand-mark"><span class="material-symbols-rounded">calendar_month</span></span><span>Agendai<span>Fisio</span></span></span><p>Projeto acadêmico para facilitar o acesso à fisioterapia.</p><small>© 2026 AgendaiFisio</small></footer>

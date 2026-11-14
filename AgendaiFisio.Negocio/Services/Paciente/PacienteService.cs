@@ -160,14 +160,30 @@ namespace AgendaiFisio.Services.Paciente
             // Busca o perfil ligado ao usuário logado.
             var paciente = await _pacientes.Consultar()
                 .Include(p => p.Endereco)
+                .Include(p => p.Usuario)
                 .FirstOrDefaultAsync(p => p.UsuarioId == usuarioId);
 
             if (paciente == null)
                 throw new KeyNotFoundException("Perfil de paciente não encontrado para este usuário.");
 
+            var dataNascimento = dto.DataNascimento.Date;
+            var idade = PoliticaDadosDemonstracao.CalcularIdade(dataNascimento, DateTime.UtcNow);
+            if (idade < 0 || idade > 130)
+                throw new ArgumentException("A data de nascimento informada é inválida.");
+
+            if (paciente.DataNascimento.Year > 1 && paciente.DataNascimento.Date != dataNascimento)
+                throw new ArgumentException("A data de nascimento não pode ser alterada após o cadastro.");
+
+            if (idade < PoliticaDadosDemonstracao.IdadeConsentimentoResponsavel &&
+                !paciente.Usuario.ConsentimentoResponsavelLegal)
+            {
+                throw new ArgumentException(
+                    "Pacientes menores de 16 anos precisam da autorização de um responsável legal.");
+            }
+
             paciente.NomeCompleto = dto.NomeCompleto;
             paciente.Cpf = dto.Cpf;
-            paciente.DataNascimento = dto.DataNascimento;
+            paciente.DataNascimento = dataNascimento;
             paciente.Telefone = dto.Telefone;
             paciente.Sexo = dto.Sexo;
             paciente.EstadoCivil = dto.EstadoCivil;

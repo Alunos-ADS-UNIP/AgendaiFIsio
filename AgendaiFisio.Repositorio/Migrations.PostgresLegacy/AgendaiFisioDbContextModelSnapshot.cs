@@ -3,12 +3,12 @@ using System;
 using AgendaiFisio.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace AgendaiFisio.Migrations.Postgres
+namespace AgendaiFisio.Repositorio.Migrations.SqlServer
 {
     [DbContext(typeof(AgendaiFisioDbContext))]
     partial class AgendaiFisioDbContextModelSnapshot : ModelSnapshot
@@ -17,33 +17,32 @@ namespace AgendaiFisio.Migrations.Postgres
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Npgsql:CollationDefinition:case_accent_insensitive", "und-u-ks-primary,und-u-ks-primary,icu,False")
-                .HasAnnotation("ProductVersion", "10.0.4")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("AgendaiFisio.Entities.Agendamento", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("DataHora")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Observacoes")
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("PacienteId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("ProfissionalId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -51,81 +50,42 @@ namespace AgendaiFisio.Migrations.Postgres
 
                     b.HasIndex("ProfissionalId", "DataHora")
                         .IsUnique()
-                        .HasFilter("\"Status\" <> 'Cancelado'");
+                        .HasFilter("[Status] <> 'Cancelado'");
 
-                    b.ToTable("Agendamentos");
-                });
+                    b.ToTable("Agendamentos", t =>
+                        {
+                            t.HasTrigger("TR_Agendamentos_ValidarBloqueio");
+                        });
 
-            modelBuilder.Entity("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AntecedentesPessoaisFamiliares")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("DataAvaliacao")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("HabitosDeVida")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("HistoriaPregressa")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("PacienteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProfissionalId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("QueixaPrincipal")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("TratamentosRealizados")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PacienteId");
-
-                    b.HasIndex("ProfissionalId");
-
-                    b.ToTable("AvaliacaoFisioterapeuta");
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.BloqueioAgenda", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("Fim")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("Inicio")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Motivo")
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<Guid>("ProfissionalId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Tipo")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
@@ -133,43 +93,47 @@ namespace AgendaiFisio.Migrations.Postgres
 
                     b.ToTable("BloqueiosAgenda", t =>
                         {
-                            t.HasCheckConstraint("CK_BloqueiosAgenda_Intervalo", "\"Fim\" > \"Inicio\"");
+                            t.HasTrigger("TR_BloqueiosAgenda_ValidarConsulta");
+
+                            t.HasCheckConstraint("CK_BloqueiosAgenda_Intervalo", "[Fim] > [Inicio]");
                         });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Endereco", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Bairro")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Cep")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Cidade")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Complemento")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Estado")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Numero")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Rua")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -180,13 +144,13 @@ namespace AgendaiFisio.Migrations.Postgres
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .UseCollation("case_accent_insensitive");
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_CI_AI");
 
                     b.HasKey("Id");
 
@@ -282,36 +246,36 @@ namespace AgendaiFisio.Migrations.Postgres
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Cpf")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("DataNascimento")
                         .HasColumnType("date");
 
                     b.Property<Guid>("EnderecoId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("EstadoCivil")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("NomeCompleto")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Sexo")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Telefone")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
@@ -323,85 +287,68 @@ namespace AgendaiFisio.Migrations.Postgres
                     b.ToTable("Pacientes");
                 });
 
-            modelBuilder.Entity("AgendaiFisio.Entities.PlanoTerapeutico", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AvaliacaoFisioterapeutaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Objetivo")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Procedimentos")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("QtdSessoes")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AvaliacaoFisioterapeutaId")
-                        .IsUnique();
-
-                    b.ToTable("PlanosTerapeutico");
-                });
-
             modelBuilder.Entity("AgendaiFisio.Entities.Profissional", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("Ativo")
-                        .HasColumnType("boolean");
+                        .HasColumnType("bit");
 
                     b.Property<string>("Bio")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Cpf")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Crefito")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("DataCadastro")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("DataNascimento")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("EnderecoId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("EspecialidadeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("EspecialidadeTextoLegado")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("Especialidade");
+
+                    b.Property<string>("FotoPerfilChave")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("NomeCompleto")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Telefone")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Crefito")
                         .IsUnique()
-                        .HasFilter("\"Crefito\" <> ''");
+                        .HasFilter("[Crefito] <> ''");
+
+                    b.HasIndex("EnderecoId")
+                        .IsUnique()
+                        .HasFilter("[EnderecoId] IS NOT NULL");
 
                     b.HasIndex("EspecialidadeId");
 
@@ -415,21 +362,47 @@ namespace AgendaiFisio.Migrations.Postgres
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AceiteLgpd")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("AceiteLgpdEm")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("ConsentimentoResponsavelLegal")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ConsentimentoResponsavelLegalEm")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DadosExpiramEmUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("NomeResponsavelLegal")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<string>("SenhaHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TipoUsuario")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VersaoTermos")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DadosExpiramEmUtc");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -438,25 +411,6 @@ namespace AgendaiFisio.Migrations.Postgres
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Agendamento", b =>
-                {
-                    b.HasOne("AgendaiFisio.Entities.Paciente", "Paciente")
-                        .WithMany()
-                        .HasForeignKey("PacienteId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("AgendaiFisio.Entities.Profissional", "Profissional")
-                        .WithMany()
-                        .HasForeignKey("ProfissionalId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Paciente");
-
-                    b.Navigation("Profissional");
-                });
-
-            modelBuilder.Entity("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", b =>
                 {
                     b.HasOne("AgendaiFisio.Entities.Paciente", "Paciente")
                         .WithMany()
@@ -505,19 +459,13 @@ namespace AgendaiFisio.Migrations.Postgres
                     b.Navigation("Usuario");
                 });
 
-            modelBuilder.Entity("AgendaiFisio.Entities.PlanoTerapeutico", b =>
-                {
-                    b.HasOne("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", "AvaliacaoFisioterapeuta")
-                        .WithOne("Plano")
-                        .HasForeignKey("AgendaiFisio.Entities.PlanoTerapeutico", "AvaliacaoFisioterapeutaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AvaliacaoFisioterapeuta");
-                });
-
             modelBuilder.Entity("AgendaiFisio.Entities.Profissional", b =>
                 {
+                    b.HasOne("AgendaiFisio.Entities.Endereco", "Endereco")
+                        .WithOne()
+                        .HasForeignKey("AgendaiFisio.Entities.Profissional", "EnderecoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("AgendaiFisio.Entities.Especialidade", "Especialidade")
                         .WithMany()
                         .HasForeignKey("EspecialidadeId")
@@ -529,14 +477,11 @@ namespace AgendaiFisio.Migrations.Postgres
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Endereco");
+
                     b.Navigation("Especialidade");
 
                     b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", b =>
-                {
-                    b.Navigation("Plano");
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Usuario", b =>

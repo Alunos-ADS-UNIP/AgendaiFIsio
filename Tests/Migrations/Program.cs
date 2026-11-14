@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using AgendaiFisio.Repositorio.Repositorios;
 
 var connectionString = Environment.GetEnvironmentVariable("MIGRATION_TEST_CONNECTION_STRING")
     ?? throw new InvalidOperationException(
@@ -91,12 +92,26 @@ try
 
     Check(await TableExistsAsync("BloqueiosAgenda"),
         "Migration inicial cria BloqueiosAgenda");
+    Check(!await TableExistsAsync("PlanosTerapeutico"),
+        "Migration remove PlanosTerapeutico sem uso no MVP");
+    Check(!await TableExistsAsync("AvaliacaoFisioterapeuta"),
+        "Migration remove AvaliacaoFisioterapeuta sem uso no MVP");
     Check(await ColumnExistsAsync("Profissionais", "FotoPerfilChave"),
         "Migration adiciona a chave privada da foto de perfil");
     Check(await ColumnExistsAsync("Usuarios", "AceiteLgpd"),
         "Migration adiciona o aceite LGPD do usuario");
     Check(await ColumnExistsAsync("Usuarios", "AceiteLgpdEm"),
         "Migration adiciona a data do aceite LGPD");
+    Check(await ColumnExistsAsync("Usuarios", "VersaoTermos"),
+        "Migration registra a versao dos termos aceitos");
+    Check(await ColumnExistsAsync("Usuarios", "DadosExpiramEmUtc"),
+        "Migration registra a expiracao dos dados em 90 dias");
+    Check(await ColumnExistsAsync("Usuarios", "ConsentimentoResponsavelLegal"),
+        "Migration registra a autorizacao do responsavel legal");
+    Check(await ColumnExistsAsync("Usuarios", "NomeResponsavelLegal"),
+        "Migration registra a identidade do responsavel legal");
+    Check(await ColumnExistsAsync("Usuarios", "ConsentimentoResponsavelLegalEm"),
+        "Migration registra a data da autorizacao do responsavel legal");
     Check(await ColumnExistsAsync("Profissionais", "EnderecoId"),
         "Migration adiciona o endereco de atendimento do profissional");
 
@@ -112,7 +127,9 @@ try
             {
                 Email = "migration-professional@example.invalid",
                 SenhaHash = "test",
-                TipoUsuario = "Profissional"
+                TipoUsuario = "Profissional",
+                VersaoTermos = "teste",
+                DadosExpiramEmUtc = DateTime.UtcNow.AddDays(-1)
             },
             NomeCompleto = "Profissional Migration",
             Crefito = "MIGRATION-1",
@@ -126,7 +143,9 @@ try
             {
                 Email = "migration-patient@example.invalid",
                 SenhaHash = "test",
-                TipoUsuario = "Paciente"
+                TipoUsuario = "Paciente",
+                VersaoTermos = "teste",
+                DadosExpiramEmUtc = DateTime.UtcNow.AddDays(-1)
             },
             Endereco = new Endereco(),
             NomeCompleto = "Paciente Migration",
@@ -213,6 +232,20 @@ try
             });
             await context.SaveChangesAsync();
         }, 51003, "Trigger impede bloqueios sobrepostos");
+    }
+
+    await using (var context = new AgendaiFisioDbContext(options))
+    {
+        var repositorio = new DadosDemonstracaoRepositorio(context);
+        var expiradas = await repositorio.ListarExpiradasAsync(DateTime.UtcNow, 100);
+        Check(expiradas.Count == 2, "Rotina localiza contas demonstrativas expiradas");
+        Check(await repositorio.ExcluirContasAsync(expiradas.Select(c => c.UsuarioId).ToArray()) == 2 &&
+              !await context.Usuarios.AnyAsync() &&
+              !await context.Pacientes.AnyAsync() &&
+              !await context.Profissionais.AnyAsync() &&
+              !await context.Agendamentos.AnyAsync() &&
+              !await context.BloqueiosAgenda.AnyAsync(),
+            "Rotina remove contas expiradas e todos os dados relacionados");
     }
 
     await using (var context = new AgendaiFisioDbContext(options))

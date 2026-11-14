@@ -1,0 +1,42 @@
+@model AppointmentListViewModel
+@{
+    ViewData["Title"] = "Agenda";
+    var role = User.IsInRole("Profissional") ? "Profissional" : "Paciente";
+    var ordered = Model.Appointments.OrderByDescending(item => item.DataHora).ToList();
+}
+<header class="page-heading"><div><span class="eyebrow">Seus atendimentos</span><h1>Agenda</h1><p>Acompanhe consultas agendadas, confirmadas, concluídas e canceladas.</p></div>@if (role == "Paciente") { <a asp-action="Create" class="button button--primary page-heading__action"><span class="material-symbols-rounded">add</span> Nova consulta</a> }</header>
+
+<form method="get" class="filter-bar filter-bar--compact">
+    <select name="status" aria-label="Filtrar por status"><option value="">Todos os status</option>@foreach (var option in new[] { "Agendado", "Confirmado", "Concluido", "Cancelado" }) { <option value="@option" selected="@(Model.Status == option ? "selected" : null)">@option</option> }</select>
+    <input type="date" name="date" value="@(Model.Date?.ToString("yyyy-MM-dd"))" aria-label="Filtrar por data" />
+    <button class="button button--primary" type="submit">Filtrar</button>
+    <a asp-action="Index" class="button button--ghost">Limpar</a>
+</form>
+
+@if (ordered.Count == 0)
+{
+    <section class="state-card state-card--center"><span class="material-symbols-rounded state-card__icon">event_available</span><h2>Nenhuma consulta encontrada</h2><p>@(role == "Paciente" ? "Agende seu próximo atendimento ou altere os filtros." : "Quando houver consultas, elas aparecerão aqui.")</p>@if (role == "Paciente") { <a asp-action="Create" class="button button--primary">Agendar consulta</a> }</section>
+}
+else
+{
+    <div class="timeline-list">
+        @foreach (var group in ordered.GroupBy(item => BrazilTime.ToLocal(item.DataHora).Date))
+        {
+            <section class="timeline-day">
+                <h2>@(group.Key == DateTime.Today ? "Hoje" : group.Key.ToString("dddd, dd 'de' MMMM", new System.Globalization.CultureInfo("pt-BR")))</h2>
+                <div class="appointment-list">
+                    @foreach (var appointment in group.OrderBy(item => item.DataHora))
+                    {
+                        var local = BrazilTime.ToLocal(appointment.DataHora);
+                        var person = role == "Profissional" ? appointment.PacienteNome : appointment.ProfissionalNome;
+                        <a asp-action="Details" asp-route-id="@appointment.Id" class="appointment-card">
+                            <div class="time-badge"><strong>@local.ToString("HH:mm")</strong><span>1 hora</span></div>
+                            <div class="appointment-card__body"><div><h3>@(string.IsNullOrWhiteSpace(person) ? (role == "Profissional" ? "Paciente" : "Fisioterapeuta") : person)</h3><p><span class="material-symbols-rounded">medical_services</span> Fisioterapia</p></div><span class="status-pill status-pill--@appointment.Status.ToLowerInvariant()">@appointment.Status</span></div>
+                            <span class="material-symbols-rounded appointment-card__arrow">chevron_right</span>
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
