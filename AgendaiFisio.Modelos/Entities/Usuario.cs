@@ -19,6 +19,17 @@ namespace AgendaiFisio.Entities
         public bool AceiteLgpd { get; set; }
         public DateTime? AceiteLgpdEm { get; set; }
 
+        // Identifica exatamente quais termos foram aceitos e limita a permanência
+        // dos dados neste aplicativo demonstrativo a 90 dias.
+        public string VersaoTermos { get; set; } = string.Empty;
+        public DateTime DadosExpiramEmUtc { get; set; }
+
+        // Para pacientes menores de 16 anos, registra a declaração feita pelo
+        // responsável legal durante a criação da conta.
+        public bool ConsentimentoResponsavelLegal { get; set; }
+        public string? NomeResponsavelLegal { get; set; }
+        public DateTime? ConsentimentoResponsavelLegalEm { get; set; }
+
         public virtual Paciente? Paciente { get; set; }
 
         public virtual Profissional? Profissional { get; set; }

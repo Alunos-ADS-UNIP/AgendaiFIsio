@@ -60,50 +60,6 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
-            modelBuilder.Entity("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AntecedentesPessoaisFamiliares")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("DataAvaliacao")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("HabitosDeVida")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("HistoriaPregressa")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("PacienteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ProfissionalId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("QueixaPrincipal")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TratamentosRealizados")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PacienteId");
-
-                    b.HasIndex("ProfissionalId");
-
-                    b.ToTable("AvaliacaoFisioterapeuta");
-                });
-
             modelBuilder.Entity("AgendaiFisio.Entities.BloqueioAgenda", b =>
                 {
                     b.Property<Guid>("Id")
@@ -331,34 +287,6 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.ToTable("Pacientes");
                 });
 
-            modelBuilder.Entity("AgendaiFisio.Entities.PlanoTerapeutico", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AvaliacaoFisioterapeutaId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Objetivo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Procedimentos")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("QtdSessoes")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AvaliacaoFisioterapeutaId")
-                        .IsUnique();
-
-                    b.ToTable("PlanosTerapeutico");
-                });
-
             modelBuilder.Entity("AgendaiFisio.Entities.Profissional", b =>
                 {
                     b.Property<Guid>("Id")
@@ -442,9 +370,22 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.Property<DateTime?>("AceiteLgpdEm")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("ConsentimentoResponsavelLegal")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ConsentimentoResponsavelLegalEm")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DadosExpiramEmUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("NomeResponsavelLegal")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<string>("SenhaHash")
                         .IsRequired()
@@ -454,7 +395,14 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("VersaoTermos")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("DadosExpiramEmUtc");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -463,25 +411,6 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Agendamento", b =>
-                {
-                    b.HasOne("AgendaiFisio.Entities.Paciente", "Paciente")
-                        .WithMany()
-                        .HasForeignKey("PacienteId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("AgendaiFisio.Entities.Profissional", "Profissional")
-                        .WithMany()
-                        .HasForeignKey("ProfissionalId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Paciente");
-
-                    b.Navigation("Profissional");
-                });
-
-            modelBuilder.Entity("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", b =>
                 {
                     b.HasOne("AgendaiFisio.Entities.Paciente", "Paciente")
                         .WithMany()
@@ -530,17 +459,6 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.Navigation("Usuario");
                 });
 
-            modelBuilder.Entity("AgendaiFisio.Entities.PlanoTerapeutico", b =>
-                {
-                    b.HasOne("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", "AvaliacaoFisioterapeuta")
-                        .WithOne("Plano")
-                        .HasForeignKey("AgendaiFisio.Entities.PlanoTerapeutico", "AvaliacaoFisioterapeutaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AvaliacaoFisioterapeuta");
-                });
-
             modelBuilder.Entity("AgendaiFisio.Entities.Profissional", b =>
                 {
                     b.HasOne("AgendaiFisio.Entities.Endereco", "Endereco")
@@ -564,11 +482,6 @@ namespace AgendaiFisio.Repositorio.Migrations.SqlServer
                     b.Navigation("Especialidade");
 
                     b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("AgendaiFisio.Entities.AvaliacaoFisioterapeuta", b =>
-                {
-                    b.Navigation("Plano");
                 });
 
             modelBuilder.Entity("AgendaiFisio.Entities.Usuario", b =>

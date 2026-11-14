@@ -27,7 +27,15 @@ await using var db = new AgendaiFisioDbContext(new DbContextOptionsBuilder<Agend
             "Configure ConnectionStrings__Padrao com o SQL Server de testes.")).Options);
 using var http = new HttpClient { BaseAddress = new Uri(args.FirstOrDefault() ?? "http://localhost:5187") };
 var prefix = "regression-" + Guid.NewGuid().ToString("N");
-var emails = new[] { prefix + "-pac@example.invalid", prefix + "-prof@example.invalid", prefix + "-pac2@example.invalid", prefix + "-prof2@example.invalid" };
+var emails = new[]
+{
+    prefix + "-pac@example.invalid",
+    prefix + "-prof@example.invalid",
+    prefix + "-pac2@example.invalid",
+    prefix + "-prof2@example.invalid",
+    prefix + "-menor-sem-consentimento@example.invalid",
+    prefix + "-menor-com-consentimento@example.invalid"
+};
 var checks = 0;
 void Check(bool condition, string name)
 {
@@ -176,29 +184,61 @@ try
         "OpenAPI documenta o contrato de hora cheia com exemplo");
     await Request(HttpMethod.Get, "/api/profissional", null, HttpStatusCode.Unauthorized, "Listagem exige autenticacao");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = prefix + "-senha-curta@example.invalid", senha = "1234567", tipoUsuario = "Paciente", aceiteLgpd = true },
+        new { email = prefix + "-senha-curta@example.invalid", senha = "1234567", tipoUsuario = "Paciente", aceiteLgpd = true, dataNascimento = "1990-01-01" },
         HttpStatusCode.BadRequest, "Cadastro rejeita senha com menos de oito caracteres");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = prefix + "-sem-aceite@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = false },
+        new { email = prefix + "-sem-aceite@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = false, dataNascimento = "1990-01-01" },
         HttpStatusCode.BadRequest, "Cadastro rejeita aceite LGPD falso");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = prefix + "-aceite-ausente@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente" },
+        new { email = prefix + "-aceite-ausente@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente", dataNascimento = "1990-01-01" },
         HttpStatusCode.BadRequest, "Cadastro rejeita aceite LGPD ausente");
     foreach (var role in new[] { "Admin", "Clinica", "Desconhecido", "" })
         await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[2], senha = "Regression123!", tipoUsuario = role, aceiteLgpd = true }, HttpStatusCode.BadRequest, "Cadastro rejeita papel " + role);
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new { email = prefix + "-sem-nascimento@example.invalid", senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = true },
+        HttpStatusCode.BadRequest, "Cadastro de paciente exige data de nascimento");
+    var nascimentoMenor = DateTime.UtcNow.Date.AddYears(-12).ToString("yyyy-MM-dd");
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new { email = emails[4], senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = true, dataNascimento = nascimentoMenor },
+        HttpStatusCode.BadRequest, "Menor de 16 anos sem autorizacao e rejeitado");
+    await Request(HttpMethod.Post, "/api/auth/register",
+        new
+        {
+            email = emails[5],
+            senha = "Regression123!",
+            tipoUsuario = "Paciente",
+            aceiteLgpd = true,
+            dataNascimento = nascimentoMenor,
+            consentimentoResponsavelLegal = true,
+            nomeResponsavelLegal = "Responsavel de Teste"
+        },
+        HttpStatusCode.OK, "Menor de 16 anos com autorizacao e cadastrado");
+    var menorPersistido = await db.Usuarios.AsNoTracking().SingleAsync(u => u.Email == emails[5]);
+    Check(menorPersistido.ConsentimentoResponsavelLegal &&
+          menorPersistido.ConsentimentoResponsavelLegalEm.HasValue &&
+          menorPersistido.NomeResponsavelLegal == "Responsavel de Teste",
+        "Cadastro persiste a autorizacao e a identidade do responsavel");
+    await db.Usuarios.Where(u => u.Id == menorPersistido.Id)
+        .ExecuteUpdateAsync(setters => setters
+            .SetProperty(u => u.DadosExpiramEmUtc, DateTime.UtcNow.AddMinutes(-1)));
+    await Request(HttpMethod.Post, "/api/auth/login",
+        new { email = emails[5], senha = "Regression123!" },
+        HttpStatusCode.Unauthorized, "Conta demonstrativa expirada nao autentica");
     for (var i = 0; i < 2; i++)
     {
-        var result = await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[i], senha = "Regression123!", tipoUsuario = i == 0 ? " paciente " : "pRoFiSsIoNaL", aceiteLgpd = true }, HttpStatusCode.OK, "Cadastro com normalizacao");
+        var result = await Request(HttpMethod.Post, "/api/auth/register", new { email = emails[i], senha = "Regression123!", tipoUsuario = i == 0 ? " paciente " : "pRoFiSsIoNaL", aceiteLgpd = true, dataNascimento = i == 0 ? "1990-01-01" : null }, HttpStatusCode.OK, "Cadastro com normalizacao");
         Check(result.GetProperty("dados").GetProperty("tipoUsuario").GetString() == (i == 0 ? "Paciente" : "Profissional"), "Papel canonico persistido");
     }
     var aceitesPersistidos = await db.Usuarios.AsNoTracking()
         .Where(u => emails.Take(2).Contains(u.Email))
         .ToListAsync();
     Check(aceitesPersistidos.Count == 2 && aceitesPersistidos.All(u =>
-            u.AceiteLgpd && u.AceiteLgpdEm.HasValue),
-        "Cadastro persiste aceite LGPD e sua data");
+            u.AceiteLgpd && u.AceiteLgpdEm.HasValue &&
+            u.VersaoTermos == PoliticaDadosDemonstracao.VersaoTermosAtual &&
+            u.DadosExpiramEmUtc > DateTime.UtcNow.AddDays(89)),
+        "Cadastro persiste aceite, versao dos termos e expiracao em 90 dias");
     await Request(HttpMethod.Post, "/api/auth/register",
-        new { email = emails[2], senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = true },
+        new { email = emails[2], senha = "Regression123!", tipoUsuario = "Paciente", aceiteLgpd = true, dataNascimento = "1990-01-01" },
         HttpStatusCode.OK, "Cadastro de segundo paciente para isolar a agenda");
     await Request(HttpMethod.Post, "/api/auth/register",
         new { email = emails[3], senha = "Regression123!", tipoUsuario = "Profissional", aceiteLgpd = true },
@@ -333,7 +373,23 @@ try
     await Request(HttpMethod.Get, "/api/paciente/" + Guid.NewGuid(), null, HttpStatusCode.NotFound,
         "Detalhe de paciente inexistente retorna 404", professionalToken);
 
-    await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725"), HttpStatusCode.OK, "Profissional atualiza perfil", professionalToken);
+    // Simula uma conta criada antes da inclusão do endereço de atendimento.
+    var profissionalLegado = await db.Profissionais.Include(p => p.Endereco)
+        .SingleAsync(p => p.Usuario.Email == emails[1]);
+    var enderecoInicial = profissionalLegado.Endereco!;
+    profissionalLegado.Endereco = null;
+    profissionalLegado.EnderecoId = null;
+    await db.SaveChangesAsync();
+    db.Enderecos.Remove(enderecoInicial);
+    await db.SaveChangesAsync();
+    db.ChangeTracker.Clear();
+    Check(!(await db.Profissionais.AsNoTracking()
+            .Where(p => p.Usuario.Email == emails[1])
+            .Select(p => p.EnderecoId)
+            .SingleAsync()).HasValue,
+        "Cenario legado inicia sem endereco de atendimento");
+
+    await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725"), HttpStatusCode.OK, "Profissional legado insere endereco ao atualizar perfil", professionalToken);
     await Request(HttpMethod.Put, "/api/profissional/completar-perfil", Professional("52998224725", prefix + " Segundo"), HttpStatusCode.OK, "Segundo profissional atualiza perfil", segundoProfissionalToken);
     await Request(HttpMethod.Put, "/api/profissional/especialidade", new { especialidadeId = (Guid?)null }, HttpStatusCode.BadRequest, "Especialidade nula rejeitada", professionalToken);
     await Request(HttpMethod.Put, "/api/profissional/especialidade", new { especialidadeId = Guid.NewGuid() }, HttpStatusCode.BadRequest, "Especialidade inexistente rejeitada", professionalToken);

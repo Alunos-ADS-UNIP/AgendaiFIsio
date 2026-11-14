@@ -17,6 +17,7 @@ using AgendaiFisio.Repositorio.Repositorios;
 using AgendaiFisio.Repositorio.Armazenamento;
 using Amazon;
 using Amazon.S3;
+using AgendaiFisio.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,8 @@ builder.Services.AddDbContext<AgendaiFisioDbContext>(options =>
 builder.Services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
 builder.Services.AddScoped<IPacienteRepositorio, PacienteRepositorio>();
 builder.Services.AddScoped<IProfissionalRepositorio, ProfissionalRepositorio>();
+builder.Services.AddScoped<IEnderecoRepositorio, EnderecoRepositorio>();
+builder.Services.AddScoped<IDadosDemonstracaoRepositorio, DadosDemonstracaoRepositorio>();
 builder.Services.AddScoped<IEspecialidadeRepositorio, EspecialidadeRepositorio>();
 builder.Services.AddScoped<IAgendamentoRepositorio, AgendamentoRepositorio>();
 builder.Services.AddScoped<IBloqueioAgendaRepositorio, BloqueioAgendaRepositorio>();
@@ -53,6 +56,7 @@ builder.Services.AddScoped<IProfissionalService, ProfissionalService>();
 builder.Services.AddScoped<IEspecialidadeService, EspecialidadeService>();
 builder.Services.AddScoped<IAgendamentoService, AgendamentoService>();
 builder.Services.AddScoped<IBloqueioAgendaService, BloqueioAgendaService>();
+builder.Services.AddHostedService<DadosDemonstracaoCleanupWorker>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings.GetValue<string>("SecretKey");

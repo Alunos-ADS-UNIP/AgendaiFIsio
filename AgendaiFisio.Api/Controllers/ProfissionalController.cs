@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -210,10 +211,22 @@ namespace AgendaiFisio.Controllers
                 // Informa quando o CREFITO informado já pertence a outro fisioterapeuta.
                 return Conflict(new { erro = ex.Message });
             }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _logger.LogWarning(ex,
+                    "Conflito de concorrência ao atualizar o perfil do profissional autenticado.");
+                return Conflict(new
+                {
+                    erro = "O perfil foi alterado durante a edição. Atualize os dados e tente novamente."
+                });
+            }
             catch (Exception ex)
             {
-                // Devolve ao cliente o erro ocorrido no processamento.
-                return BadRequest(new { erro = ex.Message });
+                _logger.LogError(ex, "Falha inesperada ao atualizar o perfil do profissional.");
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    erro = "Não foi possível atualizar o perfil. Tente novamente em alguns instantes."
+                });
             }
         }
 

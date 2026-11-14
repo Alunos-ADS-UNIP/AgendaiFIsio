@@ -7,6 +7,7 @@ BEGIN
     );
 END;
 GO
+
 BEGIN TRANSACTION;
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -374,6 +375,221 @@ IF NOT EXISTS (
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
     VALUES (N'20261105235403_InicialSqlServer', N'10.0.13');
+END;
+
+COMMIT;
+GO
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108184700_AdicionaFotoPerfilProfissional'
+)
+BEGIN
+    ALTER TABLE [Profissionais] ADD [FotoPerfilChave] nvarchar(500) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108184700_AdicionaFotoPerfilProfissional'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261108184700_AdicionaFotoPerfilProfissional', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108193713_AdicionaAceiteLgpdUsuario'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [AceiteLgpd] bit NOT NULL DEFAULT CAST(0 AS bit);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108193713_AdicionaAceiteLgpdUsuario'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [AceiteLgpdEm] datetime2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108193713_AdicionaAceiteLgpdUsuario'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261108193713_AdicionaAceiteLgpdUsuario', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108223512_AdicionaEnderecoAtendimentoProfissional'
+)
+BEGIN
+    ALTER TABLE [Profissionais] ADD [EnderecoId] uniqueidentifier NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108223512_AdicionaEnderecoAtendimentoProfissional'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Profissionais_EnderecoId] ON [Profissionais] ([EnderecoId]) WHERE [EnderecoId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108223512_AdicionaEnderecoAtendimentoProfissional'
+)
+BEGIN
+    ALTER TABLE [Profissionais] ADD CONSTRAINT [FK_Profissionais_Enderecos_EnderecoId] FOREIGN KEY ([EnderecoId]) REFERENCES [Enderecos] ([Id]) ON DELETE NO ACTION;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261108223512_AdicionaEnderecoAtendimentoProfissional'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261108223512_AdicionaEnderecoAtendimentoProfissional', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [ConsentimentoResponsavelLegal] bit NOT NULL DEFAULT CAST(0 AS bit);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [ConsentimentoResponsavelLegalEm] datetime2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [DadosExpiramEmUtc] datetime2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [NomeResponsavelLegal] nvarchar(150) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    ALTER TABLE [Usuarios] ADD [VersaoTermos] nvarchar(20) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    UPDATE [Usuarios]
+    SET [DadosExpiramEmUtc] = DATEADD(day, 90, SYSUTCDATETIME()),
+        [VersaoTermos] = 'legado-2026-11-10'
+    WHERE [DadosExpiramEmUtc] IS NULL OR [VersaoTermos] IS NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    DECLARE @var nvarchar(max);
+    SELECT @var = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Usuarios]') AND [c].[name] = N'DadosExpiramEmUtc');
+    IF @var IS NOT NULL EXEC(N'ALTER TABLE [Usuarios] DROP CONSTRAINT ' + @var + ';');
+    ALTER TABLE [Usuarios] ALTER COLUMN [DadosExpiramEmUtc] datetime2 NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    DECLARE @var1 nvarchar(max);
+    SELECT @var1 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Usuarios]') AND [c].[name] = N'VersaoTermos');
+    IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [Usuarios] DROP CONSTRAINT ' + @var1 + ';');
+    ALTER TABLE [Usuarios] ALTER COLUMN [VersaoTermos] nvarchar(20) NOT NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    CREATE INDEX [IX_Usuarios_DadosExpiramEmUtc] ON [Usuarios] ([DadosExpiramEmUtc]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261110174512_AdicionaPoliticaMenoresERetencao90Dias', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261111185306_RemoveTabelasClinicasNaoUtilizadas'
+)
+BEGIN
+    DROP TABLE [PlanosTerapeutico];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261111185306_RemoveTabelasClinicasNaoUtilizadas'
+)
+BEGIN
+    DROP TABLE [AvaliacaoFisioterapeuta];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261111185306_RemoveTabelasClinicasNaoUtilizadas'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261111185306_RemoveTabelasClinicasNaoUtilizadas', N'10.0.13');
 END;
 
 COMMIT;
